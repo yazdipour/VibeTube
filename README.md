@@ -39,7 +39,7 @@ This project is not affiliated with YouTube or Google.
    YOUTUBE_YTDLP_EXTERNAL_URL=http://localhost:8081
    ```
 
-3. Start the app:
+3. Start the app from source:
 
    ```sh
    docker compose up -d --build
@@ -81,6 +81,80 @@ You can point Docker Compose at prebuilt images by setting:
 VIBETUBE_FRONTEND_IMAGE=ghcr.io/owner/vibetube-frontend:v1.0.0
 VIBETUBE_BACKEND_IMAGE=ghcr.io/owner/vibetube-backend:v1.0.0
 VIBETUBE_YTDLP_IMAGE=ghcr.io/owner/vibetube-yt-dlp:v1.0.0
+```
+
+## Run With Docker Compose Only
+
+If you want to use the published images without cloning or building the source code, create a `docker-compose.yml` like this:
+
+```yaml
+name: vibetube
+
+services:
+  yt-dlp:
+    image: ghcr.io/yazdipour/vibetube-yt-dlp:0.0.1
+    container_name: vibetube-ytdlp
+    ports:
+      - "8081:8081"
+    networks:
+      - vibetube
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/yazdipour/vibetube-backend:0.0.1
+    container_name: vibetube-backend
+    environment:
+      YOUTUBE_DATA_DIR: /data
+      YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID}
+      YOUTUBE_OAUTH_CLIENT_SECRET: ${YOUTUBE_OAUTH_CLIENT_SECRET}
+      YOUTUBE_INNERTUBE_API_KEY: ${YOUTUBE_INNERTUBE_API_KEY}
+      YOUTUBE_YTDLP_EXTERNAL_URL: ${YOUTUBE_YTDLP_EXTERNAL_URL:-http://localhost:8081}
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-data:/data
+    depends_on:
+      - yt-dlp
+    networks:
+      - vibetube
+
+  frontend:
+    image: ghcr.io/yazdipour/vibetube-frontend:0.0.1
+    container_name: vibetube-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - vibetube
+
+networks:
+  vibetube:
+    driver: bridge
+
+volumes:
+  backend-data:
+```
+
+Create a `.env` next to that Compose file:
+
+```sh
+YOUTUBE_OAUTH_CLIENT_ID=...
+YOUTUBE_OAUTH_CLIENT_SECRET=...
+YOUTUBE_INNERTUBE_API_KEY=...
+YOUTUBE_YTDLP_EXTERNAL_URL=http://localhost:8081
+```
+
+Then start it:
+
+```sh
+docker compose up -d
+```
+
+Open:
+
+```text
+http://localhost:3000
 ```
 
 ## Development Checks
