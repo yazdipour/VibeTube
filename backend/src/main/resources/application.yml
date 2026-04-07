@@ -1,6 +1,6 @@
 spring:
   application:
-    name: smarttube-web-backend
+    name: vibetube-backend
 
 server:
   address: 0.0.0.0

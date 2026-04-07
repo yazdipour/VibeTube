@@ -1,6 +1,6 @@
 # VibeTube
 
-VibeTube is a self-hosted web app for browsing and watching YouTube content with a SmartTube-inspired experience.
+VibeTube is a self-hosted web app for browsing and watching YouTube content.
 
 It includes:
 
@@ -14,7 +14,7 @@ It includes:
 - PWA support
 - Docker Compose setup for local self-hosting
 
-This project is not affiliated with YouTube, Google, or SmartTube.
+This project is not affiliated with YouTube or Google.
 
 ## Requirements
 
@@ -56,6 +56,32 @@ This project is not affiliated with YouTube, Google, or SmartTube.
 - `frontend`: nginx static frontend and PWA shell, exposed at `http://localhost:3000`
 - `backend`: Kotlin / Spring Boot API, exposed at `http://localhost:8080`
 - `yt-dlp`: Flask helper service for video metadata and subtitles, exposed at `http://localhost:8081`
+
+## Release Images
+
+GitHub releases publish Docker images to GitHub Container Registry:
+
+```text
+ghcr.io/<owner>/<repo>-frontend:<release-tag>
+ghcr.io/<owner>/<repo>-backend:<release-tag>
+ghcr.io/<owner>/<repo>-yt-dlp:<release-tag>
+```
+
+For example, a release tagged `v1.0.0` from `owner/vibetube` publishes:
+
+```text
+ghcr.io/owner/vibetube-frontend:v1.0.0
+ghcr.io/owner/vibetube-backend:v1.0.0
+ghcr.io/owner/vibetube-yt-dlp:v1.0.0
+```
+
+You can point Docker Compose at prebuilt images by setting:
+
+```sh
+VIBETUBE_FRONTEND_IMAGE=ghcr.io/owner/vibetube-frontend:v1.0.0
+VIBETUBE_BACKEND_IMAGE=ghcr.io/owner/vibetube-backend:v1.0.0
+VIBETUBE_YTDLP_IMAGE=ghcr.io/owner/vibetube-yt-dlp:v1.0.0
+```
 
 ## Development Checks
 

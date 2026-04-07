@@ -1,18 +1,22 @@
+name: vibetube
+
 services:
   yt-dlp:
+    image: ${VIBETUBE_YTDLP_IMAGE:-vibetube-ytdlp:local}
     build:
       context: ./yt-dlp-server
-    container_name: smarttubeweb-ytdlp
+    container_name: vibetube-ytdlp
     ports:
       - "8081:8081"
     networks:
-      - smarttubenet
+      - vibetube
     restart: unless-stopped
 
   backend:
+    image: ${VIBETUBE_BACKEND_IMAGE:-vibetube-backend:local}
     build:
       context: ./backend
-    container_name: smarttubeweb-backend
+    container_name: vibetube-backend
     environment:
       YOUTUBE_DATA_DIR: /data
       YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID:-}
@@ -28,21 +32,22 @@ services:
     depends_on:
       - yt-dlp
     networks:
-      - smarttubenet
+      - vibetube
 
   frontend:
+    image: ${VIBETUBE_FRONTEND_IMAGE:-vibetube-frontend:local}
     build:
       context: ./frontend
-    container_name: smarttubeweb-frontend
+    container_name: vibetube-frontend
     depends_on:
       - backend
     ports:
       - "3000:80"
     networks:
-      - smarttubenet
+      - vibetube
 
 networks:
-  smarttubenet:
+  vibetube:
     driver: bridge
 
 volumes:

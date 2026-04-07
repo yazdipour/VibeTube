@@ -4,7 +4,7 @@ Thanks for considering a contribution.
 
 ## Ground Rules
 
-- Keep changes scoped to `SmartTubeWeb`.
+- Keep changes scoped to `VibeTube`.
 - Do not commit secrets, OAuth tokens, API keys, generated sessions, or local `.env` files.
 - Prefer small, focused pull requests with a clear summary and verification steps.
 - Keep user-facing behavior documented when adding or changing features.

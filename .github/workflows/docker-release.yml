@@ -1,0 +1,67 @@
+name: Build and publish Docker images
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.component }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+            image_suffix: frontend
+          - component: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            image_suffix: backend
+          - component: yt-dlp
+            context: ./yt-dlp-server
+            dockerfile: ./yt-dlp-server/Dockerfile
+            image_suffix: yt-dlp
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare image metadata
+        id: meta
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          echo "repository=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.component }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ghcr.io/${{ steps.meta.outputs.repository }}-${{ matrix.image_suffix }}:${{ steps.meta.outputs.version }}
+          labels: |
+            org.opencontainers.image.title=VibeTube ${{ matrix.component }}
+            org.opencontainers.image.description=VibeTube ${{ matrix.component }} container
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}

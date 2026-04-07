@@ -1,1 +1,1 @@
-rootProject.name = "smarttube-web-backend"
+rootProject.name = "vibetube-backend"
