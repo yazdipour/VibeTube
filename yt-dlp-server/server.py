@@ -6,6 +6,7 @@ import os
 import tempfile
 import urllib.parse
 import urllib.request
+import urllib.error
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import signal
@@ -27,67 +28,42 @@ signal.signal(signal.SIGTERM, cleanup)
 signal.signal(signal.SIGINT, cleanup)
 
 
-def get_available_formats(video_id):
-    """Get available formats for a video"""
-    cmd = [
-        "yt-dlp",
-        "--no-download",
-        "--list-formats",
-        "--no-warnings",
-        f"https://www.youtube.com/watch?v={video_id}",
-    ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-    if result.returncode != 0:
+def get_available_formats(video_id, info=None):
+    """Return browser-safe quality selectors that always include audio."""
+    info = info or get_video_info(video_id)
+    if not info:
         return []
 
+    heights = {}
+    for fmt in info.get("formats") or []:
+        if fmt.get("vcodec") in (None, "none") or fmt.get("height") is None:
+            continue
+        if fmt.get("format_note") == "storyboard":
+            continue
+        height = int(float(fmt.get("height")))
+        fps = int(float(fmt.get("fps") or 0))
+        heights[height] = max(heights.get(height, 0), fps)
+
     formats = []
-    lines = result.stdout.split("\n")
-    # Skip header lines until we find the separator
-    format_start = False
-    for line in lines:
-        if (
-            "--------------------------------------------------------------------------------------------------"
-            in line
-        ):
-            format_start = True
+    for height in sorted(heights.keys(), reverse=True):
+        if height <= 0:
             continue
-        if not format_start:
-            continue
-        if not line.strip() or line.startswith("[info]"):
-            continue
-
-        parts = line.split()
-        if len(parts) >= 4:  # ID, EXT, RESOLUTION, FPS at minimum
-            try:
-                format_id = parts[0]
-                ext = parts[1]
-                resolution = parts[2]
-                fps = parts[3] if len(parts) > 3 else "0"
-
-                # Skip if FPS is not a number (like 'audio' or 'video')
-                if not fps.replace(".", "").isdigit():
-                    fps = "0"
-
-                # Skip audio-only formats and storyboard formats
-                if "audio" in line.lower() and "video" not in line.lower():
-                    continue
-                if "storyboard" in line.lower():
-                    continue
-
-                # Only include formats with actual resolution (not just audio)
-                if resolution != "audio only" and "x" in resolution:
-                    formats.append(
-                        {
-                            "format_id": format_id,
-                            "ext": ext,
-                            "resolution": resolution,
-                            "fps": fps,
-                        }
-                    )
-            except (ValueError, IndexError):
-                pass
+        selector = (
+            f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
+            f"best[height<={height}][ext=mp4]/"
+            f"bestvideo[height<={height}]+bestaudio/"
+            f"best[height<={height}]"
+        )
+        formats.append(
+            {
+                "format_id": selector,
+                "ext": "mp4",
+                "resolution": f"{height}p",
+                "fps": str(heights[height] or 0),
+                "mimeType": "video/mp4",
+                "qualityLabel": f"{height}p",
+            }
+        )
     return formats
 
 
@@ -99,6 +75,8 @@ def download_video(video_id, output_path, format_selector="bestvideo+bestaudio/b
         format_selector,
         "-o",
         output_path,
+        "--merge-output-format",
+        "mp4",
         "--no-warnings",
         "--no-part",  # Don't use .part files
         f"https://www.youtube.com/watch?v={video_id}",
@@ -173,7 +151,7 @@ def get_subtitle_tracks(video_id, info=None):
                 "default": len(unique_tracks) == 0,
             }
         )
-    return unique_tracks
+    return unique_tracks[:1]
 
 
 def get_subtitle_url(video_id, language, automatic=False):
@@ -186,6 +164,35 @@ def get_subtitle_url(video_id, language, automatic=False):
     for entry in entries:
         if entry.get("ext") == "vtt" and entry.get("url"):
             return entry["url"]
+    return None
+
+
+def download_subtitle_with_ytdlp(video_id, language, automatic=False):
+    """Fetch a subtitle through yt-dlp when direct timedtext URLs are throttled."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_template = os.path.join(temp_dir, "subtitle.%(ext)s")
+        cmd = [
+            "yt-dlp",
+            "--skip-download",
+            "--sub-format",
+            "vtt",
+            "--sub-langs",
+            language,
+            "-o",
+            output_template,
+            "--no-warnings",
+            f"https://www.youtube.com/watch?v={video_id}",
+        ]
+        cmd.insert(2, "--write-auto-subs" if automatic else "--write-subs")
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            return None
+
+        for file_name in os.listdir(temp_dir):
+            if file_name.endswith(".vtt"):
+                with open(os.path.join(temp_dir, file_name), "rb") as file:
+                    return file.read()
     return None
 
 
@@ -347,7 +354,11 @@ def get_video_info_endpoint(video_id):
 @app.route("/video/<video_id>/formats", methods=["GET"])
 def get_video_formats(video_id):
     try:
-        formats = get_available_formats(video_id)
+        info = get_video_info(video_id)
+        if not info:
+            return jsonify({"error": "Failed to fetch video info"}), 500
+
+        formats = get_available_formats(video_id, info)
         return jsonify({"formats": formats})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timeout fetching video formats"}), 504
@@ -371,11 +382,25 @@ def get_video_subtitle(video_id):
         language = request.args.get("lang", "en")
         automatic = request.args.get("automatic", "false").lower() == "true"
         subtitle_url = get_subtitle_url(video_id, language, automatic)
-        if not subtitle_url:
-            return jsonify({"error": "Subtitle track was not found"}), 404
+        body = None
+        if subtitle_url:
+            try:
+                subtitle_request = urllib.request.Request(
+                    subtitle_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                    },
+                )
+                with urllib.request.urlopen(subtitle_request, timeout=30) as response:
+                    body = response.read()
+            except urllib.error.HTTPError:
+                body = download_subtitle_with_ytdlp(video_id, language, automatic)
 
-        with urllib.request.urlopen(subtitle_url, timeout=30) as response:
-            body = response.read()
+        if body is None:
+            body = download_subtitle_with_ytdlp(video_id, language, automatic)
+
+        if body is None:
+            body = b"WEBVTT\n\n"
 
         return Response(
             body,

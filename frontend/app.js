@@ -969,16 +969,16 @@ function stopPlayback() {
 async function loadVideoFormats(videoId, selectedFormat) {
   try {
     const payload = await fetchJson(`${endpoints.videos(videoId)}/formats`);
-    const formats = Array.isArray(payload?.formats) ? payload.formats : [];
+    const formats = getDisplayVideoFormats(payload?.formats);
 
     qualitySelect.replaceChildren();
 
     const defaultOption = document.createElement("option");
     defaultOption.value = "bestvideo+bestaudio/best";
     defaultOption.textContent = "Best available";
-    qualitySelect.append(defaultOption);
 
     if (!formats.length) {
+      qualitySelect.append(defaultOption);
       qualitySelect.value = selectedFormat || defaultOption.value;
       return payload;
     }
@@ -1007,20 +1007,42 @@ async function loadVideoFormats(videoId, selectedFormat) {
   }
 }
 
+function getDisplayVideoFormats(formats) {
+  const byHeight = new Map();
+  for (const format of Array.isArray(formats) ? formats : []) {
+    const value = String(format?.formatId || format?.itag || "");
+    const height = getFormatHeight(format);
+    if (!value || height <= 0) {
+      continue;
+    }
+
+    const current = byHeight.get(height);
+    if (!current || value.includes("+bestaudio")) {
+      byHeight.set(height, { ...format, qualityLabel: `${height}p` });
+    }
+  }
+
+  return [...byHeight.entries()]
+    .sort((left, right) => right[0] - left[0])
+    .map((entry) => entry[1]);
+}
+
+function getFormatHeight(format) {
+  const label = format?.qualityLabel || format?.resolution || "";
+  const resolution = label.match(/(\d{3,4})\s*p/i)?.[1]
+    || label.match(/\d{3,4}\s*x\s*(\d{3,4})/i)?.[1]
+    || label.match(/\bHD\s*(\d{3,4})\b/i)?.[1]
+    || label.match(/\b(\d{3,4})\b/)?.[1]
+    || "";
+  return Number.parseInt(resolution, 10) || 0;
+}
+
 function findPreferredFormat(formats) {
   const parsedFormats = formats
     .map((format) => {
-      const label = format.qualityLabel || "";
-      const resolution = label.match(/(\d{3,4})\s*p/i)?.[1]
-        || label.match(/\d{3,4}\s*x\s*(\d{3,4})/i)?.[1]
-        || label.match(/\bHD\s*(\d{3,4})\b/i)?.[1]
-        || label.match(/\b(\d{3,4})\b/)?.[1]
-        || "";
-      const height = Number.parseInt(resolution, 10) || 0;
-
       return {
         value: String(format.formatId || format.itag),
-        height,
+        height: getFormatHeight(format),
       };
     })
     .filter((format) => format.value && format.height > 0);

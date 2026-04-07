@@ -37,7 +37,7 @@ class YouTubeVideoService(
                 throw ResponseStatusException(HttpStatus.BAD_GATEWAY, infoResponse.error)
             }
             
-            val streamUrl = "${getStreamBaseUrl()}/video/$videoId?format=$formatSelector"
+            val streamUrl = "${getStreamBaseUrl()}/video/$videoId?format=${urlEncode(formatSelector)}"
             val subtitles = infoResponse.subtitles.orEmpty().map { it.toSubtitleTrack(videoId, getStreamBaseUrl()) }
             
             VideoStreamInfo(
@@ -74,9 +74,9 @@ class YouTubeVideoService(
                 VideoFormat(
                     formatId = ytdlpFormat.format_id ?: "",
                     itag = ytdlpFormat.format_id?.toIntOrNull() ?: 0,
-                    url = "${getStreamBaseUrl()}/video/${videoId}?format=${ytdlpFormat.format_id}",
-                    mimeType = "video/${ytdlpFormat.ext}",
-                    qualityLabel = "${ytdlpFormat.resolution} ${ytdlpFormat.fps}fps",
+                    url = "${getStreamBaseUrl()}/video/${videoId}?format=${urlEncode(ytdlpFormat.format_id ?: "")}",
+                    mimeType = ytdlpFormat.mimeType ?: "video/${ytdlpFormat.ext}",
+                    qualityLabel = ytdlpFormat.qualityLabel ?: "${ytdlpFormat.resolution} ${ytdlpFormat.fps}fps",
                     bitrate = 0
                 )
             } ?: emptyList()

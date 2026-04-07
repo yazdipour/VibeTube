@@ -119,6 +119,12 @@ YOUTUBE_INNERTUBE_API_KEY=...
 YOUTUBE_YTDLP_EXTERNAL_URL=http://localhost:8081
 ```
 
+If you open the app from another machine, replace `localhost` in `YOUTUBE_YTDLP_EXTERNAL_URL` with the Docker host name or IP that the browser can reach. For example, if the app is opened as `http://lab:3000`, use:
+
+```sh
+YOUTUBE_YTDLP_EXTERNAL_URL=http://lab:8081
+```
+
 Then start it:
 
 ```sh
