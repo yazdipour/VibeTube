@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException
 class YouTubeInnerTubeClient(
     private val authService: YouTubeAuthService,
     private val httpClient: YouTubeHttpClient,
+    private val properties: YouTubeProperties,
 ) : YouTubeInnerTubeApi {
     override fun browse(browseId: String, params: String?): JsonNode =
         post(
@@ -39,10 +40,12 @@ class YouTubeInnerTubeClient(
 
     private fun post(endpoint: String, body: Map<String, Any>): JsonNode {
         val session = authService.getAuthorizedSession()
+        val apiKey = properties.innertubeApiKey?.takeIf { it.isNotBlank() }
+            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_INNERTUBE_API_KEY is not set. Set this env var to enable YouTube InnerTube features.")
         val url = httpClient.buildUrl(
             "https://www.youtube.com/youtubei/v1/$endpoint",
             mapOf(
-                "key" to TV_API_KEY,
+                "key" to apiKey,
                 "prettyPrint" to "false",
             ),
         )
@@ -77,7 +80,7 @@ class YouTubeInnerTubeClient(
             headers = mapOf(
                 "Authorization" to "${session.tokenType} ${session.accessToken}",
                 "User-Agent" to TV_USER_AGENT,
-                "X-Goog-Api-Key" to TV_API_KEY,
+                "X-Goog-Api-Key" to apiKey,
                 "X-Goog-Visitor-Id" to TV_VISITOR_DATA,
                 "X-YouTube-Client-Name" to TV_CLIENT_NAME_ID,
                 "X-YouTube-Client-Version" to TV_CLIENT_VERSION,
@@ -96,7 +99,6 @@ class YouTubeInnerTubeClient(
     }
 
     companion object {
-        private const val TV_API_KEY = "AIzaSyDCU8hByM-4DrUqRUYnGn-3llEO78bcxq8"
         private const val TV_CLIENT_NAME = "TVHTML5"
         private const val TV_CLIENT_NAME_ID = "7"
         private const val TV_CLIENT_VERSION = "7.20260311.12.00"

@@ -44,3 +44,7 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
+data/
+backend/data/
+youtube-session.json
+**/youtube-session.json

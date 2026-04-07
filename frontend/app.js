@@ -71,6 +71,18 @@ let currentSegments = [];
 let skipCooldown = false;
 let hls = null;
 
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("./sw.js");
+  } catch (error) {
+    console.debug("Service worker registration failed", error);
+  }
+}
+
 function setBanner(message, isError = false) {
   if (!toastContainer) {
     return;
@@ -1187,6 +1199,7 @@ document.addEventListener("click", async (event) => {
 
 window.addEventListener("hashchange", dispatchRoute);
 
+registerServiceWorker();
 hideDeviceFlow();
 await Promise.all([loadAuth(), loadWatchLaterCache()]);
 if (!window.location.hash) {

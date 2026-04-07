@@ -9,4 +9,5 @@ data class YouTubeProperties(
     val oauthClientId: String? = null,
     val oauthClientSecret: String? = null,
     val ytdlpExternalUrl: String? = null,
+    val innertubeApiKey: String? = null,
 )

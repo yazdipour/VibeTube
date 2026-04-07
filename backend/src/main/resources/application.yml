@@ -12,6 +12,7 @@ youtube:
   oauth-client-id: ${YOUTUBE_OAUTH_CLIENT_ID:}
   oauth-client-secret: ${YOUTUBE_OAUTH_CLIENT_SECRET:}
   ytdlp-external-url: ${YOUTUBE_YTDLP_EXTERNAL_URL:}
+  innertube-api-key: ${YOUTUBE_INNERTUBE_API_KEY:}
 
 sponsorblock:
   api:

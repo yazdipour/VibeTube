@@ -3,7 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f0f0f" />
+    <meta name="description" content="VibeTube web app for browsing and watching YouTube subscriptions, channels, playlists, and Watch Later." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="VibeTube" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>VibeTube</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-maskable.svg" />
     <!-- Use Google Fonts Outfit / Inter for a modern beautiful look -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,7 +50,9 @@
           </form>
 
           <div class="topbar-actions">
-            <button id="refresh-all" class="ghost-button" type="button">Refresh</button>
+            <button id="refresh-all" class="ghost-button icon-button" type="button" aria-label="Refresh">
+              <span class="refresh-icon" aria-hidden="true"></span>
+            </button>
 
             <div class="account-menu">
               <button id="account-button" class="account-button" type="button" aria-expanded="false" aria-controls="account-popover">
