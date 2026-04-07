@@ -696,7 +696,31 @@ function handleTimeUpdate() {
   }
 }
 
-function attachVideoSource(streamUrl) {
+function attachSubtitleTracks(subtitles = []) {
+  const tracks = Array.isArray(subtitles) ? subtitles : [];
+  const defaultTrack = tracks.find((track) => track?.default) || tracks[0];
+
+  for (const track of tracks) {
+    if (!track?.url || !track?.language) {
+      continue;
+    }
+
+    const trackElement = document.createElement("track");
+    trackElement.kind = "subtitles";
+    trackElement.src = track.url;
+    trackElement.srclang = track.language;
+    trackElement.label = track.label || track.language;
+    trackElement.default = track === defaultTrack;
+    if (trackElement.default) {
+      trackElement.addEventListener("load", () => {
+        trackElement.track.mode = "showing";
+      }, { once: true });
+    }
+    videoPlayer.append(trackElement);
+  }
+}
+
+function attachVideoSource(streamUrl, subtitles = []) {
   if (hls) {
     hls.destroy();
     hls = null;
@@ -710,6 +734,7 @@ function attachVideoSource(streamUrl) {
       hls = new window.Hls();
       hls.loadSource(streamUrl);
       hls.attachMedia(videoPlayer);
+      attachSubtitleTracks(subtitles);
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         videoPlayer.play().catch(() => {});
       });
@@ -718,6 +743,7 @@ function attachVideoSource(streamUrl) {
 
     if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
       videoPlayer.src = streamUrl;
+      attachSubtitleTracks(subtitles);
       videoPlayer.addEventListener("loadedmetadata", () => {
         videoPlayer.play().catch(() => {});
       }, { once: true });
@@ -729,6 +755,7 @@ function attachVideoSource(streamUrl) {
   source.src = streamUrl;
   source.type = "video/mp4";
   videoPlayer.append(source);
+  attachSubtitleTracks(subtitles);
   videoPlayer.load();
   videoPlayer.play().catch(() => {});
 }
@@ -831,16 +858,20 @@ async function renderWatchPage(videoId, formatOverride) {
       throw new Error(videoData?.error || "No stream URL available");
     }
 
-    attachVideoSource(videoData.hlsManifestUrl || videoData.streamUrl);
+    attachVideoSource(videoData.hlsManifestUrl || videoData.streamUrl, videoData.subtitles);
     videoPlayer.removeEventListener("timeupdate", handleTimeUpdate);
     videoPlayer.addEventListener("timeupdate", handleTimeUpdate);
 
     watchTitle.textContent = videoData.title || formatsPayload?.title || "Video";
     watchChannel.textContent = videoData.author || formatsPayload?.author || "Unknown channel";
     watchMetadata.textContent = videoData.lengthSeconds ? `${Math.round(videoData.lengthSeconds / 60)} min` : "";
-    videoMeta.textContent = currentSegments.length > 0
+    const subtitleCount = Array.isArray(videoData.subtitles) ? videoData.subtitles.length : 0;
+    const sponsorBlockText = currentSegments.length > 0
       ? `${currentSegments.length} SponsorBlock segment${currentSegments.length === 1 ? "" : "s"} loaded`
       : "SponsorBlock has no segments for this video.";
+    videoMeta.textContent = subtitleCount > 0
+      ? `${sponsorBlockText} ${subtitleCount} subtitle track${subtitleCount === 1 ? "" : "s"} available.`
+      : sponsorBlockText;
     updateWatchLaterButton(videoId);
     setBanner("Video loaded.");
     return true;

@@ -1,6 +1,7 @@
 package com.smarttube.web.videos
 
 import com.smarttube.web.youtube.YouTubeVideoService
+import com.smarttube.web.youtube.SubtitleTrack
 import com.smarttube.web.youtube.VideoFormatsInfo
 import com.smarttube.web.youtube.VideoStreamInfo
 import org.springframework.web.bind.annotation.GetMapping
@@ -31,6 +32,15 @@ class VideosController(
             streamUrl = streamUrl,
             hlsManifestUrl = hlsManifestUrl,
             formats = formats.map { it.toDto() },
+            subtitles = subtitles.map { it.toDto() },
+        )
+
+        private fun SubtitleTrack.toDto() = SubtitleTrackDto(
+            language = language,
+            label = label,
+            url = url,
+            automatic = automatic,
+            default = default,
         )
     }
 }
@@ -43,6 +53,15 @@ data class VideoStreamResponse(
     val streamUrl: String,
     val hlsManifestUrl: String?,
     val formats: List<VideoFormatDto>,
+    val subtitles: List<SubtitleTrackDto>,
+)
+
+data class SubtitleTrackDto(
+    val language: String,
+    val label: String,
+    val url: String,
+    val automatic: Boolean,
+    val default: Boolean,
 )
 
 data class VideoFormatDto(

@@ -4,6 +4,8 @@ import json
 import sys
 import os
 import tempfile
+import urllib.parse
+import urllib.request
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import signal
@@ -125,6 +127,66 @@ def get_video_info(video_id):
         return json.loads(result.stdout)
     except:
         return None
+
+
+def get_subtitle_tracks(video_id, info=None):
+    """Get available manual and automatic subtitle tracks for a video."""
+    info = info or get_video_info(video_id)
+    if not info:
+        return []
+
+    tracks = []
+
+    def append_tracks(source, automatic=False):
+        for lang, entries in (source or {}).items():
+            for entry in entries or []:
+                if entry.get("ext") != "vtt" or not entry.get("url"):
+                    continue
+                tracks.append(
+                    {
+                        "language": lang,
+                        "label": entry.get("name") or lang,
+                        "automatic": automatic,
+                    }
+                )
+                break
+
+    append_tracks(info.get("subtitles"), automatic=False)
+    append_tracks(info.get("automatic_captions"), automatic=True)
+
+    def score(track):
+        lang = track["language"].lower()
+        english_score = 0 if lang == "en" else 1 if lang.startswith("en") else 2
+        automatic_score = 1 if track["automatic"] else 0
+        return (english_score, automatic_score, lang)
+
+    seen = set()
+    unique_tracks = []
+    for track in sorted(tracks, key=score):
+        key = (track["language"], track["automatic"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_tracks.append(
+            {
+                **track,
+                "default": len(unique_tracks) == 0,
+            }
+        )
+    return unique_tracks
+
+
+def get_subtitle_url(video_id, language, automatic=False):
+    info = get_video_info(video_id)
+    if not info:
+        return None
+
+    source = info.get("automatic_captions") if automatic else info.get("subtitles")
+    entries = (source or {}).get(language) or []
+    for entry in entries:
+        if entry.get("ext") == "vtt" and entry.get("url"):
+            return entry["url"]
+    return None
 
 
 def parse_range(range_header, file_size):
@@ -272,6 +334,7 @@ def get_video_info_endpoint(video_id):
                 "author": info.get("uploader", "Unknown"),
                 "lengthSeconds": info.get("duration", 0),
                 "thumbnailUrl": info.get("thumbnail", ""),
+                "subtitles": get_subtitle_tracks(video_id, info),
             }
         )
 
@@ -288,6 +351,42 @@ def get_video_formats(video_id):
         return jsonify({"formats": formats})
     except subprocess.TimeoutExpired:
         return jsonify({"error": "Timeout fetching video formats"}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/video/<video_id>/subtitles", methods=["GET"])
+def get_video_subtitles(video_id):
+    try:
+        return jsonify({"subtitles": get_subtitle_tracks(video_id)})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Timeout fetching video subtitles"}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/video/<video_id>/subtitle", methods=["GET"])
+def get_video_subtitle(video_id):
+    try:
+        language = request.args.get("lang", "en")
+        automatic = request.args.get("automatic", "false").lower() == "true"
+        subtitle_url = get_subtitle_url(video_id, language, automatic)
+        if not subtitle_url:
+            return jsonify({"error": "Subtitle track was not found"}), 404
+
+        with urllib.request.urlopen(subtitle_url, timeout=30) as response:
+            body = response.read()
+
+        return Response(
+            body,
+            status=200,
+            headers={
+                "Content-Type": "text/vtt; charset=utf-8",
+                "Content-Disposition": f'inline; filename="{video_id}-{urllib.parse.quote(language)}.vtt"',
+            },
+        )
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "Timeout fetching video subtitle"}), 504
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

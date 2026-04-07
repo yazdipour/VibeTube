@@ -6,6 +6,8 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 import org.springframework.web.server.ResponseStatusException
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @Service
 class YouTubeVideoService(
@@ -36,6 +38,7 @@ class YouTubeVideoService(
             }
             
             val streamUrl = "${getStreamBaseUrl()}/video/$videoId?format=$formatSelector"
+            val subtitles = infoResponse.subtitles.orEmpty().map { it.toSubtitleTrack(videoId, getStreamBaseUrl()) }
             
             VideoStreamInfo(
                 videoId = videoId,
@@ -45,6 +48,7 @@ class YouTubeVideoService(
                 streamUrl = streamUrl,
                 hlsManifestUrl = null,
                 formats = emptyList(),
+                subtitles = subtitles,
             )
         } catch (e: Exception) {
             throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "Video extraction failed: ${e.message}")
@@ -96,7 +100,15 @@ data class YtdlpVideoInfoResponse(
     val author: String?,
     val lengthSeconds: Int?,
     val thumbnailUrl: String?,
+    val subtitles: List<YtdlpSubtitleTrack>?,
     val error: String?,
+)
+
+data class YtdlpSubtitleTrack(
+    val language: String?,
+    val label: String?,
+    val automatic: Boolean?,
+    val default: Boolean?,
 )
 
 data class YtdlpVideoResponse(
@@ -146,6 +158,15 @@ data class VideoStreamInfo(
     val streamUrl: String,
     val hlsManifestUrl: String?,
     val formats: List<VideoFormat>,
+    val subtitles: List<SubtitleTrack>,
+)
+
+data class SubtitleTrack(
+    val language: String,
+    val label: String,
+    val url: String,
+    val automatic: Boolean,
+    val default: Boolean,
 )
 
 data class VideoFormat(
@@ -165,3 +186,17 @@ data class VideoFormat(
         bitrate = bitrate,
     )
 }
+
+private fun YtdlpSubtitleTrack.toSubtitleTrack(videoId: String, baseUrl: String): SubtitleTrack {
+    val language = language?.takeIf { it.isNotBlank() } ?: "en"
+    val automatic = automatic ?: false
+    return SubtitleTrack(
+        language = language,
+        label = label?.takeIf { it.isNotBlank() } ?: language,
+        url = "$baseUrl/video/$videoId/subtitle?lang=${urlEncode(language)}&automatic=$automatic",
+        automatic = automatic,
+        default = default ?: false,
+    )
+}
+
+private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
