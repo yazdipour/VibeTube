@@ -246,9 +246,9 @@ def get_video(video_id):
             file_size = cache[cache_key]["size"]
         else:
             # Download video
-            temp_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-            temp_path = temp_file.name
-            temp_file.close()
+            fd, temp_path = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd)
+            os.unlink(temp_path)
 
             print(
                 f"Downloading {video_id} with format {format_selector}...", flush=True
