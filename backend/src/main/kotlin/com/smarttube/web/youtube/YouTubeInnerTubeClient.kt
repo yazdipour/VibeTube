@@ -21,6 +21,12 @@ class YouTubeInnerTubeClient(
             },
         )
 
+    override fun search(query: String): JsonNode =
+        post(
+            endpoint = "search",
+            body = mapOf("query" to query),
+        )
+
     override fun editPlaylist(playlistId: String, actions: List<Map<String, String>>) {
         post(
             endpoint = "browse/edit_playlist",
@@ -101,6 +107,8 @@ class YouTubeInnerTubeClient(
 
 interface YouTubeInnerTubeApi {
     fun browse(browseId: String, params: String? = null): JsonNode
+
+    fun search(query: String): JsonNode
 
     fun editPlaylist(playlistId: String, actions: List<Map<String, String>>)
 }

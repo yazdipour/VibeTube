@@ -4,10 +4,14 @@ const endpoints = {
   auth: `${API_BASE}/api/auth/status`,
   login: `${API_BASE}/api/auth/login`,
   logout: `${API_BASE}/api/auth/logout`,
-  subscriptions: `${API_BASE}/api/subscriptions`,
-  subscriptionsFeed: `${API_BASE}/api/subscriptions/feed`,
+  home: `${API_BASE}/api/home`,
+  channels: `${API_BASE}/api/subscriptions`,
+  channelVideos: (channelId) => `${API_BASE}/api/subscriptions/${encodeURIComponent(channelId)}/videos`,
+  subscriptionFeed: `${API_BASE}/api/subscriptions/feed`,
   playlists: `${API_BASE}/api/playlists`,
   watchLater: `${API_BASE}/api/watch-later`,
+  search: (query) => `${API_BASE}/api/search?q=${encodeURIComponent(query)}`,
+  imageCache: (url) => `${API_BASE}/api/image-cache?url=${encodeURIComponent(url)}`,
   playlist: (playlistId) => `${API_BASE}/api/playlists/${encodeURIComponent(playlistId)}`,
   videos: (videoId) => `${API_BASE}/api/videos/${encodeURIComponent(videoId)}`,
   segments: (videoId) => `${API_BASE}/api/videos/${encodeURIComponent(videoId)}/segments`,
@@ -16,7 +20,6 @@ const endpoints = {
 const toastContainer = document.querySelector("#toast-container");
 const accountButton = document.querySelector("#account-button");
 const accountPopover = document.querySelector("#account-popover");
-const accountAvatar = document.querySelector("#account-avatar");
 const authTitle = document.querySelector("#auth-title");
 const authStatus = document.querySelector("#auth-status");
 const authDetails = document.querySelector("#auth-details");
@@ -33,6 +36,8 @@ const pageMeta = document.querySelector("#page-meta");
 const browseGrid = document.querySelector("#browse-grid");
 const libraryMeta = document.querySelector("#library-meta");
 const libraryList = document.querySelector("#library-list");
+const channelsMeta = document.querySelector("#channels-meta");
+const channelsList = document.querySelector("#channels-list");
 const playlistTitle = document.querySelector("#playlist-title");
 const playlistMeta = document.querySelector("#playlist-meta");
 const playlistGrid = document.querySelector("#playlist-grid");
@@ -46,11 +51,14 @@ const watchLaterButton = document.querySelector("#watch-later-toggle");
 const qualitySelect = document.querySelector("#quality-select");
 const skipIndicator = document.querySelector("#skip-indicator");
 const skipText = document.querySelector("#skip-text");
+const searchInput = document.querySelector("#search-input");
 
 const appState = {
   auth: null,
-  route: { name: "subscriptions" },
-  subscriptionsItems: [],
+  route: { name: "home" },
+  homeItems: [],
+  channelItems: [],
+  subscriptionItems: [],
   watchLaterItems: [],
   watchLaterSupported: true,
   currentVideoId: null,
@@ -211,6 +219,25 @@ function normalizeVideoItem(item) {
   };
 }
 
+function cachedImageUrl(url) {
+  if (!url) {
+    return "";
+  }
+
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const cacheableHost = host === "ggpht.com" ||
+      host.endsWith(".ggpht.com") ||
+      host === "googleusercontent.com" ||
+      host.endsWith(".googleusercontent.com") ||
+      host === "ytimg.com" ||
+      host.endsWith(".ytimg.com");
+    return cacheableHost ? endpoints.imageCache(url) : url;
+  } catch {
+    return url;
+  }
+}
+
 function renderPairs(target, pairs) {
   target.replaceChildren();
 
@@ -341,10 +368,50 @@ function renderLibrary(items) {
   }
 }
 
+function renderChannels(items) {
+  channelsList.replaceChildren();
+
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "empty-state";
+    li.textContent = "No subscribed channels available.";
+    channelsList.append(li);
+    return;
+  }
+
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.className = "card-item channel-card clickable";
+    li.dataset.channelId = item?.channelId || "";
+    li.dataset.channelName = item?.channelName || "Unknown channel";
+
+    const thumbnail = document.createElement("div");
+    thumbnail.className = "channel-avatar";
+    if (item?.thumbnailUrl) {
+      const img = document.createElement("img");
+      img.src = cachedImageUrl(item.thumbnailUrl);
+      img.alt = "";
+      img.loading = "lazy";
+      thumbnail.append(img);
+    } else {
+      thumbnail.textContent = (item?.channelName || "?").trim().charAt(0).toUpperCase() || "?";
+    }
+
+    const details = document.createElement("div");
+    details.className = "channel-details";
+    const name = document.createElement("strong");
+    name.textContent = item?.channelName || "Unknown channel";
+    details.append(name);
+
+    li.append(thumbnail, details);
+    channelsList.append(li);
+  }
+}
+
 function parseRoute() {
-  const hash = window.location.hash || "#/subscriptions";
+  const hash = window.location.hash || "#/home";
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
-  const name = parts[0] || "subscriptions";
+  const name = parts[0] || "home";
 
   if (name === "watch" && parts[1]) {
     return { name: "watch", videoId: decodeURIComponent(parts[1]) };
@@ -354,15 +421,23 @@ function parseRoute() {
     return { name: "playlist", playlistId: decodeURIComponent(parts[1]) };
   }
 
-  if (["subscriptions", "library", "watch-later"].includes(name)) {
+  if (name === "search" && parts[1]) {
+    return { name: "search", query: decodeURIComponent(parts.slice(1).join("/")) };
+  }
+
+  if (name === "channels" && parts[1]) {
+    return { name: "channel-videos", channelId: decodeURIComponent(parts[1]) };
+  }
+
+  if (["home", "subscriptions", "channels", "library", "watch-later"].includes(name)) {
     return { name };
   }
 
-  return { name: "subscriptions" };
+  return { name: "home" };
 }
 
 function activateSection(sectionName) {
-  const activeSection = ["subscriptions", "watch-later"].includes(sectionName) ? "browse" : sectionName;
+  const activeSection = ["home", "subscriptions", "channel-videos", "search", "watch-later"].includes(sectionName) ? "browse" : sectionName;
 
   for (const section of routeSections) {
     section.classList.toggle("hidden", section.dataset.routeSection !== activeSection);
@@ -375,12 +450,16 @@ function activateSection(sectionName) {
 
 function routeTitle(route) {
   return {
+    home: "Home",
     subscriptions: "Subscriptions",
+    channels: "Channels",
+    "channel-videos": "Channel Videos",
+    search: "Search",
     library: "Library",
     "watch-later": "Watch Later",
     playlist: "Playlist",
     watch: "Watch",
-  }[route.name] || "Subscriptions";
+  }[route.name] || "Home";
 }
 
 async function dispatchRoute(options = {}) {
@@ -404,8 +483,16 @@ async function dispatchRoute(options = {}) {
 
   activateSection(route.name);
 
-  if (route.name === "subscriptions") {
-    return renderSubscriptionsFeed(options);
+  if (route.name === "home") {
+    return renderHomeFeed(options);
+  } else if (route.name === "subscriptions") {
+    return renderSubscriptionFeed(options);
+  } else if (route.name === "search") {
+    return renderSearchResults(route.query, options);
+  } else if (route.name === "channels") {
+    return loadChannels(options);
+  } else if (route.name === "channel-videos") {
+    return renderChannelVideos(route.channelId, options);
   } else if (route.name === "library") {
     return loadLibrary(options);
   } else if (route.name === "watch-later") {
@@ -426,7 +513,6 @@ function navigateTo(route) {
 
 function setAccountSummary(auth) {
   appState.auth = auth;
-  accountAvatar.textContent = (auth.userName || "Guest").trim().charAt(0).toUpperCase() || "G";
   accountButton.title = auth.signedIn ? `${auth.userName} (${auth.email})` : "Sign in to VibeTube";
   accountButton.setAttribute("aria-label", auth.signedIn ? `Account for ${auth.userName}` : "Sign in to VibeTube");
   if (authTitle) {
@@ -492,22 +578,72 @@ async function loadAuth() {
   }
 }
 
-async function renderSubscriptionsFeed(options = {}) {
-  pageTitle.textContent = "Subscriptions";
+async function renderHomeFeed(options = {}) {
+  pageTitle.textContent = "Home";
 
   try {
-    const payload = await fetchCachedJson(endpoints.subscriptionsFeed, {
-      cacheKey: "subscriptions-feed",
+    const payload = await fetchCachedJson(endpoints.home, {
+      cacheKey: "home-feed",
       force: options.force,
     });
     const items = normalizeListPayload(payload);
-    appState.subscriptionsItems = items;
+    appState.homeItems = items;
     setMetaText(pageMeta, `${items.length} video${items.length === 1 ? "" : "s"}`);
+    renderVideoGrid(browseGrid, items, "No home videos available.", { watchLaterAction: "add" });
+    return true;
+  } catch (error) {
+    appState.homeItems = [];
+    setMetaText(pageMeta, error.status === 401 ? "Sign in to load Home." : "Failed to load Home feed.");
+    renderVideoGrid(browseGrid, [], error.message, { isError: true });
+    return false;
+  }
+}
+
+async function renderSubscriptionFeed(options = {}) {
+  pageTitle.textContent = "Subscriptions";
+
+  try {
+    const payload = await fetchCachedJson(endpoints.subscriptionFeed, {
+      cacheKey: "subscription-feed",
+      force: options.force,
+    });
+    const items = normalizeListPayload(payload);
+    appState.subscriptionItems = items;
+    setMetaText(pageMeta, `${items.length} video${items.length === 1 ? "" : "s"} from subscriptions`);
     renderVideoGrid(browseGrid, items, "No subscription videos available.", { watchLaterAction: "add" });
     return true;
   } catch (error) {
-    appState.subscriptionsItems = [];
-    setMetaText(pageMeta, error.status === 401 ? "Sign in to load subscriptions." : "Failed to load subscription feed.");
+    appState.subscriptionItems = [];
+    setMetaText(pageMeta, error.status === 401 ? "Sign in to load Subscriptions." : "Failed to load Subscriptions.");
+    renderVideoGrid(browseGrid, [], error.message, { isError: true });
+    return false;
+  }
+}
+
+async function renderSearchResults(query, options = {}) {
+  const normalizedQuery = (query || "").trim();
+  if (searchInput) {
+    searchInput.value = normalizedQuery;
+  }
+  pageTitle.textContent = normalizedQuery ? `Search: ${normalizedQuery}` : "Search";
+
+  if (!normalizedQuery) {
+    setMetaText(pageMeta, "Enter a search query.");
+    renderVideoGrid(browseGrid, [], "Enter a search query.");
+    return false;
+  }
+
+  try {
+    const payload = await fetchCachedJson(endpoints.search(normalizedQuery), {
+      cacheKey: `search:${normalizedQuery}`,
+      force: options.force,
+    });
+    const items = normalizeListPayload(payload);
+    setMetaText(pageMeta, `${items.length} result${items.length === 1 ? "" : "s"}`);
+    renderVideoGrid(browseGrid, items, `No results for "${normalizedQuery}".`, { watchLaterAction: "add" });
+    return true;
+  } catch (error) {
+    setMetaText(pageMeta, error.status === 401 ? "Sign in to search." : "Search failed.");
     renderVideoGrid(browseGrid, [], error.message, { isError: true });
     return false;
   }
@@ -530,6 +666,50 @@ async function loadLibrary(options = {}) {
     li.className = "error-state";
     li.textContent = error.message;
     libraryList.append(li);
+    return false;
+  }
+}
+
+async function loadChannels(options = {}) {
+  try {
+    const payload = await fetchCachedJson(endpoints.channels, {
+      cacheKey: "channels",
+      force: options.force,
+    });
+    const items = normalizeListPayload(payload);
+    appState.channelItems = items;
+    setMetaText(channelsMeta, `${items.length} channel${items.length === 1 ? "" : "s"}`);
+    renderChannels(items);
+    return true;
+  } catch (error) {
+    appState.channelItems = [];
+    setMetaText(channelsMeta, error.status === 401 ? "Sign in to load Channels." : "Failed to load Channels.");
+    channelsList.replaceChildren();
+    const li = document.createElement("li");
+    li.className = "error-state";
+    li.textContent = error.message;
+    channelsList.append(li);
+    return false;
+  }
+}
+
+async function renderChannelVideos(channelId, options = {}) {
+  const cachedChannel = appState.channelItems.find((item) => item.channelId === channelId);
+  const channelName = cachedChannel?.channelName || "Channel";
+  pageTitle.textContent = channelName;
+
+  try {
+    const payload = await fetchCachedJson(endpoints.channelVideos(channelId), {
+      cacheKey: `channel-videos:${channelId}`,
+      force: options.force,
+    });
+    const items = normalizeListPayload(payload);
+    setMetaText(pageMeta, `${items.length} video${items.length === 1 ? "" : "s"}`);
+    renderVideoGrid(browseGrid, items, `No videos available for ${channelName}.`, { watchLaterAction: "add" });
+    return true;
+  } catch (error) {
+    setMetaText(pageMeta, error.status === 401 ? "Sign in to load channel videos." : "Failed to load channel videos.");
+    renderVideoGrid(browseGrid, [], error.message, { isError: true });
     return false;
   }
 }
@@ -949,7 +1129,12 @@ async function loadWatchLaterCache() {
 document.querySelector("#refresh-all")?.addEventListener("click", refreshCurrentRoute);
 document.querySelector(".topbar-search")?.addEventListener("submit", (event) => {
   event.preventDefault();
-  setBanner("Search is not implemented yet.");
+  const query = (searchInput?.value || "").trim();
+  if (!query) {
+    setBanner("Enter a search query.", true);
+    return;
+  }
+  navigateTo(`#/search/${encodeURIComponent(query)}`);
 });
 authActionButton?.addEventListener("click", toggleAuthAction);
 
@@ -988,6 +1173,12 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  const channelCard = event.target.closest(".channel-card[data-channel-id]");
+  if (channelCard?.dataset.channelId) {
+    navigateTo(`#/channels/${encodeURIComponent(channelCard.dataset.channelId)}`);
+    return;
+  }
+
   const playlistCard = event.target.closest(".card-item[data-playlist-id]");
   if (playlistCard?.dataset.playlistId) {
     navigateTo(`#/playlist/${encodeURIComponent(playlistCard.dataset.playlistId)}`);
@@ -999,6 +1190,6 @@ window.addEventListener("hashchange", dispatchRoute);
 hideDeviceFlow();
 await Promise.all([loadAuth(), loadWatchLaterCache()]);
 if (!window.location.hash) {
-  history.replaceState(null, "", "#/subscriptions");
+  history.replaceState(null, "", "#/home");
 }
 await dispatchRoute();

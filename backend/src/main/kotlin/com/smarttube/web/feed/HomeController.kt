@@ -18,7 +18,7 @@ class HomeController(
         return FeedVideoListResponse(
             items = items,
             total = items.size,
-            stub = liveMetadata("Home feed", "youtubei-tv-subscriptions"),
+            stub = liveMetadata("Home feed", "youtubei-tv-home"),
         )
     }
 }

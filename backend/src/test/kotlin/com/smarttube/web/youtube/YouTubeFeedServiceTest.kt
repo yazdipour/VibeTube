@@ -224,18 +224,125 @@ class YouTubeFeedServiceTest {
         assertThat(videos.map { it.videoId }).containsExactly("fallback-video-id")
     }
 
+    @Test
+    fun `home videos exclude unknown channel cards`() {
+        val innerTubeApi = FakeInnerTubeApi(
+            objectMapper.readTree(
+                """
+                {
+                  "contents": [
+                    {
+                      "videoRenderer": {
+                        "videoId": "unknown-video-id",
+                        "title": { "simpleText": "Unknown video" },
+                        "thumbnail": { "thumbnails": [{ "url": "https://img/unknown.jpg" }] }
+                      }
+                    },
+                    {
+                      "videoRenderer": {
+                        "videoId": "known-video-id",
+                        "title": { "simpleText": "Known video" },
+                        "shortBylineText": { "simpleText": "Known channel" },
+                        "thumbnail": { "thumbnails": [{ "url": "https://img/known.jpg" }] }
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val service = YouTubeFeedService(
+            innerTubeClient = innerTubeApi,
+            dataService = mock(YouTubeDataService::class.java),
+        )
+
+        val videos = service.listHomeVideos()
+
+        assertThat(videos.map { it.videoId }).containsExactly("known-video-id")
+    }
+
+    @Test
+    fun `home videos do not fall back to subscriptions`() {
+        val innerTubeApi = FakeInnerTubeApi(
+            objectMapper.readTree(
+                """
+                {
+                  "contents": [
+                    {
+                      "videoRenderer": {
+                        "videoId": "unknown-video-id",
+                        "title": { "simpleText": "Unknown video" },
+                        "thumbnail": { "thumbnails": [{ "url": "https://img/unknown.jpg" }] }
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val service = YouTubeFeedService(
+            innerTubeClient = innerTubeApi,
+            dataService = mock(YouTubeDataService::class.java),
+        )
+
+        val videos = service.listHomeVideos()
+
+        assertThat(innerTubeApi.calls).containsExactly(
+            BrowseCall("FEwhat_to_watch", null),
+        )
+        assertThat(videos).isEmpty()
+    }
+
+    @Test
+    fun `search videos delegates to innertube search`() {
+        val innerTubeApi = FakeInnerTubeApi(
+            searchResponse = objectMapper.readTree(
+                """
+                {
+                  "contents": [
+                    {
+                      "videoRenderer": {
+                        "videoId": "search-video-id",
+                        "title": { "simpleText": "Search video" },
+                        "shortBylineText": { "simpleText": "Search channel" },
+                        "thumbnail": { "thumbnails": [{ "url": "https://img/search.jpg" }] }
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+        val service = YouTubeFeedService(
+            innerTubeClient = innerTubeApi,
+            dataService = mock(YouTubeDataService::class.java),
+        )
+
+        val videos = service.searchVideos("  cats  ")
+
+        assertThat(innerTubeApi.searchCalls).containsExactly("cats")
+        assertThat(videos.map { it.videoId }).containsExactly("search-video-id")
+    }
+
     private data class BrowseCall(val browseId: String, val params: String?)
 
     private class FakeInnerTubeApi(
         private vararg val browseResponses: JsonNode,
+        private val searchResponse: JsonNode? = null,
     ) : YouTubeInnerTubeApi {
         val calls = mutableListOf<BrowseCall>()
+        val searchCalls = mutableListOf<String>()
 
         override fun browse(browseId: String, params: String?): JsonNode {
             calls += BrowseCall(browseId, params)
             return browseResponses.getOrElse(calls.lastIndex) {
                 error("No fake response configured for browse call ${calls.size}")
             }
+        }
+
+        override fun search(query: String): JsonNode {
+            searchCalls += query
+            return searchResponse ?: error("No fake response configured for search call ${searchCalls.size}")
         }
 
         override fun editPlaylist(playlistId: String, actions: List<Map<String, String>>) = Unit

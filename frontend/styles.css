@@ -244,6 +244,16 @@ button { font: inherit; }
   text-align: center;
 }
 
+.account-icon::before {
+  content: "";
+  width: 36px;
+  height: 36px;
+  display: block;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 .primary-button {
   background: var(--pill-active-bg);
   color: var(--pill-active-text);
@@ -549,6 +559,40 @@ button { font: inherit; }
 .card-item p { margin: 0 0 4px; color: var(--text-meta); font-size: 0.9rem; }
 .card-item .channel-link,
 .card-item .subscription-toggle { margin-top: auto; align-self: flex-start; }
+
+.channel-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+}
+
+.channel-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--pill-bg);
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.channel-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.channel-details {
+  min-width: 0;
+}
+
+.channel-details strong {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 
 .player-panel,
 .watch-player-panel {

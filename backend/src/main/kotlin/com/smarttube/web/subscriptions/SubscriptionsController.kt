@@ -31,6 +31,16 @@ class SubscriptionsController(
         )
     }
 
+    @GetMapping("/{channelId}/videos")
+    fun listChannelVideos(@PathVariable channelId: String): FeedVideoListResponse {
+        val items = youTubeDataService.listChannelUploadVideos(channelId).map { it.toDto() }
+        return FeedVideoListResponse(
+            items = items,
+            total = items.size,
+            stub = liveMetadata("Channel videos", "youtube-data-api-channel-uploads"),
+        )
+    }
+
     @GetMapping("/{channelId}")
     fun getSubscription(@PathVariable channelId: String): SubscriptionDetailsResponse =
         youTubeDataService.getSubscription(channelId)

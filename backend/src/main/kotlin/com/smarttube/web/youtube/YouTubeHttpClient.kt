@@ -37,6 +37,18 @@ class YouTubeHttpClient(
     fun getJson(url: String, headers: Map<String, String> = emptyMap()): JsonNode =
         objectMapper.readTree(getText(url, headers))
 
+    fun getBytes(url: String, headers: Map<String, String> = emptyMap()): Pair<ByteArray, String?> {
+        val requestBuilder = HttpRequest.newBuilder(URI.create(url))
+            .timeout(Duration.ofSeconds(30))
+            .GET()
+
+        headers.forEach(requestBuilder::header)
+
+        val response = sendBytes(requestBuilder.build())
+        ensureSuccess(response.statusCode(), "GET", url)
+        return response.body() to response.headers().firstValue("Content-Type").orElse(null)
+    }
+
     fun postJson(url: String, body: Any, headers: Map<String, String> = emptyMap()): JsonNode {
         val payload = objectMapper.writeValueAsString(body)
         val requestBuilder = HttpRequest.newBuilder(URI.create(url))
@@ -115,14 +127,29 @@ class YouTubeHttpClient(
             )
         }
 
+    private fun sendBytes(request: HttpRequest): HttpResponse<ByteArray> =
+        try {
+            client.send(request, HttpResponse.BodyHandlers.ofByteArray())
+        } catch (error: Exception) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Request to YouTube failed: ${error.message}",
+                error,
+            )
+        }
+
     private fun ensureSuccess(response: HttpResponse<String>, method: String, url: String) {
-        if (response.statusCode() in 200..299) {
+        ensureSuccess(response.statusCode(), method, url)
+    }
+
+    private fun ensureSuccess(statusCode: Int, method: String, url: String) {
+        if (statusCode in 200..299) {
             return
         }
 
         throw ResponseStatusException(
             HttpStatus.BAD_GATEWAY,
-            "YouTube request failed for $method $url with status ${response.statusCode()}",
+            "YouTube request failed for $method $url with status $statusCode",
         )
     }
 

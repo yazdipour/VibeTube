@@ -9,16 +9,28 @@ class YouTubeFeedService(
     private val dataService: YouTubeDataService,
 ) {
     fun listHomeVideos(): List<YouTubeVideoCard> {
-        val homeVideos = runCatching { innerTubeClient.browse("FEwhat_to_watch").extractVideoCards() }.getOrDefault(emptyList())
-        val subscriptionVideos = homeVideos.ifEmpty {
-            runCatching { innerTubeClient.browse("FEsubscriptions").extractVideoCards() }.getOrDefault(emptyList())
-        }
-        return subscriptionVideos.ifEmpty { dataService.listSubscriptionUploadVideos(FEED_LIMIT) }.take(FEED_LIMIT)
+        return runCatching {
+            innerTubeClient.browse("FEwhat_to_watch").extractVideoCards().filterKnownChannels()
+        }.getOrDefault(emptyList()).take(FEED_LIMIT)
     }
 
     fun listSubscriptionFeedVideos(): List<YouTubeVideoCard> {
-        val videos = runCatching { innerTubeClient.browse("FEsubscriptions").extractVideoCards() }.getOrDefault(emptyList())
-        return videos.ifEmpty { dataService.listSubscriptionUploadVideos(FEED_LIMIT) }.take(FEED_LIMIT)
+        val sortedUploadVideos = runCatching { dataService.listSubscriptionUploadVideos(FEED_LIMIT) }.getOrDefault(emptyList())
+        val innerTubeVideos = sortedUploadVideos.ifEmpty {
+            runCatching { innerTubeClient.browse("FEsubscriptions").extractVideoCards() }.getOrDefault(emptyList())
+        }
+        return innerTubeVideos.take(FEED_LIMIT)
+    }
+
+    fun searchVideos(query: String): List<YouTubeVideoCard> {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) {
+            return emptyList()
+        }
+
+        return runCatching { innerTubeClient.search(normalizedQuery).extractVideoCards() }
+            .getOrDefault(emptyList())
+            .take(FEED_LIMIT)
     }
 
     fun listWatchLaterVideos(): List<YouTubeVideoCard> {
@@ -62,6 +74,9 @@ class YouTubeFeedService(
         private const val WATCH_LATER_PLAYLIST_BROWSE_ID = "VLWL"
     }
 }
+
+private fun List<YouTubeVideoCard>.filterKnownChannels(): List<YouTubeVideoCard> =
+    filter { it.channelName.trim().equals("Unknown channel", ignoreCase = true).not() }
 
 data class YouTubeVideoCard(
     val videoId: String,

@@ -23,26 +23,33 @@ class YouTubeDataService(
 ) {
     fun listSubscriptions(): SubscriptionListResponse {
         val session = authService.getAuthorizedSession()
-        val json = getJson(
-            "https://www.googleapis.com/youtube/v3/subscriptions",
-            mapOf(
-                "part" to "snippet",
-                "mine" to "true",
-                "maxResults" to "50",
-            ),
-            session,
-        )
+        val items = mutableListOf<SubscriptionDto>()
+        var pageToken: String? = null
 
-        val items = json.path("items").map { item ->
-            val snippet = item.path("snippet")
-            SubscriptionDto(
-                channelId = snippet.path("resourceId").path("channelId").asText(""),
-                channelName = snippet.path("title").asText("Unknown channel"),
-                thumbnailUrl = snippet.bestThumbnailUrl(),
-                subscriberCountLabel = "Subscribed channel",
-                notificationsEnabled = false,
+        do {
+            val query = buildMap {
+                put("part", "snippet")
+                put("mine", "true")
+                put("maxResults", "50")
+                pageToken?.let { put("pageToken", it) }
+            }
+            val json = getJson(
+                "https://www.googleapis.com/youtube/v3/subscriptions",
+                query,
+                session,
             )
-        }
+            items += json.path("items").map { item ->
+                val snippet = item.path("snippet")
+                SubscriptionDto(
+                    channelId = snippet.path("resourceId").path("channelId").asText(""),
+                    channelName = snippet.path("title").asText("Unknown channel"),
+                    thumbnailUrl = snippet.bestThumbnailUrl(),
+                    subscriberCountLabel = "Subscribed channel",
+                    notificationsEnabled = false,
+                )
+            }
+            pageToken = json.path("nextPageToken").asText("").ifBlank { null }
+        } while (pageToken != null)
 
         return SubscriptionListResponse(
             items = items,
@@ -106,6 +113,13 @@ class YouTubeDataService(
     fun listPlaylistVideoCards(playlistId: String, limit: Int = 20): List<YouTubeVideoCard> {
         val session = authService.getAuthorizedSession()
         return listPlaylistVideoCards(playlistId = playlistId, perPlaylistLimit = limit, session = session).take(limit)
+    }
+
+    fun listChannelUploadVideos(channelId: String, limit: Int = 20): List<YouTubeVideoCard> {
+        val session = authService.getAuthorizedSession()
+        val uploadsPlaylistId = getUploadsPlaylistId(channelId, session)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Uploads playlist for channel $channelId was not found")
+        return listPlaylistVideoCards(playlistId = uploadsPlaylistId, perPlaylistLimit = limit, session = session).take(limit)
     }
 
     fun listPlaylists(): PlaylistListResponse {

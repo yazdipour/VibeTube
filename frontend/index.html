@@ -23,7 +23,9 @@
         </div>
 
         <nav class="sidebar-nav">
-          <button class="nav-link active" type="button" data-route="subscriptions" data-hash="#/subscriptions">Subscriptions</button>
+          <button class="nav-link active" type="button" data-route="home" data-hash="#/home">Home</button>
+          <button class="nav-link" type="button" data-route="subscriptions" data-hash="#/subscriptions">Subscriptions</button>
+          <button class="nav-link" type="button" data-route="channels" data-hash="#/channels">Channels</button>
           <button class="nav-link" type="button" data-route="library" data-hash="#/library">Library</button>
           <button class="nav-link" type="button" data-route="watch-later" data-hash="#/watch-later">Watch Later</button>
         </nav>
@@ -43,7 +45,7 @@
 
             <div class="account-menu">
               <button id="account-button" class="account-button" type="button" aria-expanded="false" aria-controls="account-popover">
-                <span id="account-avatar" class="account-avatar">G</span>
+                <span id="account-avatar" class="account-avatar account-icon" aria-hidden="true"></span>
               </button>
 
               <section id="account-popover" class="account-popover hidden" aria-live="polite">
@@ -76,7 +78,7 @@
         <section class="content-grid">
           <section class="panel main-panel" data-route-section="browse">
             <div class="panel-header">
-              <h2 id="page-title">Subscriptions</h2>
+              <h2 id="page-title">Home</h2>
               <p id="page-meta" class="meta-text view-meta hidden">Loading...</p>
             </div>
             <div id="browse-grid" class="video-grid"></div>
@@ -88,6 +90,14 @@
               <p id="library-meta" class="meta-text hidden">Loading...</p>
             </div>
             <ul id="library-list" class="card-list"></ul>
+          </section>
+
+          <section class="panel main-panel hidden" data-route-section="channels">
+            <div class="panel-header">
+              <h2>Channels</h2>
+              <p id="channels-meta" class="meta-text hidden">Loading...</p>
+            </div>
+            <ul id="channels-list" class="card-list channel-list"></ul>
           </section>
 
           <section class="panel main-panel hidden" data-route-section="playlist">
