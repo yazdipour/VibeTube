@@ -1,0 +1,46 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Build outputs
+build/
+out/
+dist/
+target/
+*.class
+*.jar
+
+# Gradle
+.gradle/
+
+# Node and frontend tooling
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# IDE and OS metadata
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Local agent/tooling state
+.codex/
+.codex-plugin/
+.opencode/
+
+# Runtime logs and temp files
+*.log
+*.tmp
+*.swp

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VibeTube</title>
+    <!-- Use Google Fonts Outfit / Inter for a modern beautiful look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- App Shell Frame for Premium Web App look -->
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <div class="sidebar-brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <p class="sidebar-label">VibeTube</p>
+            <strong>Browse</strong>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <button class="nav-link active" type="button" data-route="subscriptions" data-hash="#/subscriptions">Subscriptions</button>
+          <button class="nav-link" type="button" data-route="library" data-hash="#/library">Library</button>
+          <button class="nav-link" type="button" data-route="watch-later" data-hash="#/watch-later">Watch Later</button>
+        </nav>
+      </aside>
+
+      <div class="app-main">
+        <header class="topbar">
+          <form class="topbar-search" role="search">
+            <label class="search-field" for="search-input">
+              <span class="sr-only">Search</span>
+              <input id="search-input" type="search" placeholder="Search" autocomplete="off" />
+            </label>
+          </form>
+
+          <div class="topbar-actions">
+            <button id="refresh-all" class="ghost-button" type="button">Refresh</button>
+
+            <div class="account-menu">
+              <button id="account-button" class="account-button" type="button" aria-expanded="false" aria-controls="account-popover">
+                <span id="account-avatar" class="account-avatar">G</span>
+              </button>
+
+              <section id="account-popover" class="account-popover hidden" aria-live="polite">
+                <div class="panel-header compact-header">
+                  <div>
+                    <h2 id="auth-title">Account Status</h2>
+                  </div>
+                </div>
+
+                <div id="auth-status" class="state-row">Loading...</div>
+                <dl id="auth-details" class="details-list"></dl>
+
+                <div id="auth-device-flow" class="device-flow hidden" aria-live="polite">
+                  <p class="device-flow-label">Activate in browser</p>
+                  <p id="auth-device-code" class="device-code">-</p>
+                  <p id="auth-device-link" class="device-link"></p>
+                  <p id="auth-device-status" class="meta-text">Waiting to start sign-in.</p>
+                </div>
+
+                <div class="actions-row" style="margin-top:16px;">
+                  <button id="auth-action-button" class="primary-button" type="button" data-action="sign-in">Sign in</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </header>
+
+        <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+        <section class="content-grid">
+          <section class="panel main-panel" data-route-section="browse">
+            <div class="panel-header">
+              <h2 id="page-title">Subscriptions</h2>
+              <p id="page-meta" class="meta-text view-meta hidden">Loading...</p>
+            </div>
+            <div id="browse-grid" class="video-grid"></div>
+          </section>
+
+          <section class="panel main-panel hidden" data-route-section="library">
+            <div class="panel-header">
+              <h2>Library</h2>
+              <p id="library-meta" class="meta-text hidden">Loading...</p>
+            </div>
+            <ul id="library-list" class="card-list"></ul>
+          </section>
+
+          <section class="panel main-panel hidden" data-route-section="playlist">
+            <div class="panel-header">
+              <h2 id="playlist-title">Playlist</h2>
+              <p id="playlist-meta" class="meta-text hidden">Loading...</p>
+            </div>
+            <div id="playlist-grid" class="video-grid"></div>
+          </section>
+
+          <section class="watch-page hidden" data-route-section="watch">
+            <article class="watch-player-panel" aria-labelledby="watch-title">
+              <div class="video-container">
+                <video id="video-player" controls playsinline crossorigin="anonymous"></video>
+                <div id="skip-indicator" class="skip-indicator hidden">
+                  <span id="skip-text">Skipping sponsor...</span>
+                </div>
+              </div>
+
+              <div class="watch-details">
+                <h1 id="watch-title">Watch</h1>
+                <p id="watch-channel" class="meta-text"></p>
+                <p id="watch-metadata" class="meta-text"></p>
+                <p id="video-meta" class="meta-text"></p>
+                <div class="watch-actions">
+                  <label class="quality-field" for="quality-select">
+                    <span class="sr-only">Quality</span>
+                    <select id="quality-select">
+                      <option value="bestvideo+bestaudio/best" selected>Best available</option>
+                    </select>
+                  </label>
+                  <button id="watch-later-toggle" class="ghost-button" type="button" data-action="add">Save to Watch Later</button>
+                </div>
+              </div>
+            </article>
+
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

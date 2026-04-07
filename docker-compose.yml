@@ -1,0 +1,49 @@
+services:
+  yt-dlp:
+    build:
+      context: ./yt-dlp-server
+    container_name: smarttubeweb-ytdlp
+    ports:
+      - "8081:8081"
+    networks:
+      - smarttubenet
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: smarttubeweb-backend
+    environment:
+      YOUTUBE_DATA_DIR: /data
+      YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID:-}
+      YOUTUBE_OAUTH_CLIENT_SECRET: ${YOUTUBE_OAUTH_CLIENT_SECRET:-}
+      YOUTUBE_YTDLP_EXTERNAL_URL: ${YOUTUBE_YTDLP_EXTERNAL_URL:-http://localhost:8081}
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - yt-dlp
+    networks:
+      - smarttubenet
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: smarttubeweb-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - smarttubenet
+
+networks:
+  smarttubenet:
+    driver: bridge
+
+volumes:
+  backend-data:
+  ytdlp-cache:

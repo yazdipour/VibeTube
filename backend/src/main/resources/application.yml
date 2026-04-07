@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: smarttube-web-backend
+
+server:
+  address: 0.0.0.0
+  port: ${PORT:8080}
+
+youtube:
+  data-dir: ${YOUTUBE_DATA_DIR:./data}
+  activate-url: https://www.youtube.com/activate
+  oauth-client-id: ${YOUTUBE_OAUTH_CLIENT_ID:}
+  oauth-client-secret: ${YOUTUBE_OAUTH_CLIENT_SECRET:}
+  ytdlp-external-url: ${YOUTUBE_YTDLP_EXTERNAL_URL:}
+
+sponsorblock:
+  api:
+    url: https://sponsor.ajay.app
+
+ytdlp:
+  service:
+    url: http://yt-dlp:8081
