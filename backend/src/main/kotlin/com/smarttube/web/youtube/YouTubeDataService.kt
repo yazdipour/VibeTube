@@ -206,6 +206,7 @@ class YouTubeDataService(
                 metadataLabel = item.path("contentDetails").path("videoPublishedAt").asText(
                     snippet.path("publishedAt").asText(""),
                 ).ifBlank { null },
+                percentWatched = null,
             )
         }
     }

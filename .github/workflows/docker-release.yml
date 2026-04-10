@@ -24,10 +24,6 @@ jobs:
             context: ./backend
             dockerfile: ./backend/Dockerfile
             image_suffix: backend
-          - component: yt-dlp
-            context: ./yt-dlp-server
-            dockerfile: ./yt-dlp-server/Dockerfile
-            image_suffix: yt-dlp
 
     steps:
       - name: Check out repository

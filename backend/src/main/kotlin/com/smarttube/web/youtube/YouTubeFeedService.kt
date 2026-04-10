@@ -85,6 +85,7 @@ data class YouTubeVideoCard(
     val thumbnailUrl: String,
     val durationLabel: String?,
     val metadataLabel: String?,
+    val percentWatched: Int?,
 )
 
 internal fun JsonNode.extractVideoCards(): List<YouTubeVideoCard> {
@@ -145,6 +146,7 @@ private fun JsonNode.toTileVideoCard(): YouTubeVideoCard? {
             ?.path("text")
             ?.displayText(),
         metadataLabel = metadataLabel,
+        percentWatched = header.path("thumbnailOverlays").extractPercentWatched(),
     )
 }
 
@@ -175,6 +177,7 @@ private fun JsonNode.toStandardVideoCard(): YouTubeVideoCard? {
             ?: path("publishedTimeText").displayText()
             ?: path("viewCountText").displayText()
             ?: path("title").path("accessibility").path("accessibilityData").path("label").asText(null),
+        percentWatched = path("thumbnailOverlays").extractPercentWatched(),
     )
 }
 
@@ -210,6 +213,11 @@ private fun JsonNode.toLockupVideoCard(): YouTubeVideoCard? {
             .path("overlays")
             .firstThumbnailBadgeText(),
         metadataLabel = metadataParts.drop(1).joinToString(" • ").ifBlank { null },
+        percentWatched = path("thumbnailBottomOverlayViewModel")
+            .path("progressBar")
+            .path("thumbnailOverlayProgressBarViewModel")
+            .path("startPercent")
+            .asProgressPercent(),
     )
 }
 
@@ -262,6 +270,39 @@ private fun JsonNode.firstThumbnailBadgeText(): String? {
             ?.path("text")
             ?.asText(null)
     }
+}
+
+private fun JsonNode.extractPercentWatched(): Int? {
+    if (!isArray) {
+        return null
+    }
+
+    return firstNotNullOfOrNull { overlay ->
+        overlay.path("thumbnailOverlayResumePlaybackRenderer")
+            .path("percentDurationWatched")
+            .asProgressPercent()
+    }
+}
+
+private fun JsonNode.asProgressPercent(): Int? {
+    if (isMissingNode || isNull) {
+        return null
+    }
+
+    val value = when {
+        isNumber -> asDouble()
+        isTextual -> asText().toDoubleOrNull()
+        else -> null
+    } ?: return null
+
+    val normalized = when {
+        value.isNaN() || value.isInfinite() -> return null
+        value in 0.0..1.0 -> value * 100.0
+        else -> value
+    }
+
+    val rounded = normalized.toInt()
+    return rounded.coerceIn(0, 100)
 }
 
 private fun JsonNode.getOrNull(index: Int): JsonNode? = if (isArray && size() > index) get(index) else null

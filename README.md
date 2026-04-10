@@ -8,7 +8,6 @@ It includes:
 - YouTube device-code sign-in
 - Channel upload browsing
 - Watch Later add/remove support
-- yt-dlp-backed video playback metadata
 - Subtitle track support
 - SponsorBlock segment lookup
 - PWA support
@@ -26,7 +25,6 @@ This project is not affiliated with YouTube or Google.
 
 - `frontend`: nginx static frontend and PWA shell, exposed at `http://localhost:3000`
 - `backend`: Kotlin / Spring Boot API, exposed at `http://localhost:8080`
-- `yt-dlp`: Flask helper service for video metadata and subtitles, exposed at `http://localhost:8081`
 
 ## Quick Start
 
@@ -42,7 +40,6 @@ This project is not affiliated with YouTube or Google.
    YOUTUBE_OAUTH_CLIENT_ID=...
    YOUTUBE_OAUTH_CLIENT_SECRET=...
    YOUTUBE_INNERTUBE_API_KEY=...
-   YOUTUBE_YTDLP_EXTERNAL_URL=http://localhost:8081
    ```
 
 3. Start the app from source:
@@ -65,15 +62,6 @@ If you want to use the published images without cloning or building the source c
 name: vibetube
 
 services:
-  yt-dlp:
-    image: ghcr.io/yazdipour/vibetube-yt-dlp:0.0.1
-    container_name: vibetube-ytdlp
-    ports:
-      - "8081:8081"
-    networks:
-      - vibetube
-    restart: unless-stopped
-
   backend:
     image: ghcr.io/yazdipour/vibetube-backend:0.0.1
     container_name: vibetube-backend
@@ -82,13 +70,10 @@ services:
       YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID}
       YOUTUBE_OAUTH_CLIENT_SECRET: ${YOUTUBE_OAUTH_CLIENT_SECRET}
       YOUTUBE_INNERTUBE_API_KEY: ${YOUTUBE_INNERTUBE_API_KEY}
-      YOUTUBE_YTDLP_EXTERNAL_URL: ${YOUTUBE_YTDLP_EXTERNAL_URL:-http://localhost:8081}
     ports:
       - "8080:8080"
     volumes:
       - backend-data:/data
-    depends_on:
-      - yt-dlp
     networks:
       - vibetube
 
@@ -116,13 +101,6 @@ Create a `.env` next to that Compose file:
 YOUTUBE_OAUTH_CLIENT_ID=...
 YOUTUBE_OAUTH_CLIENT_SECRET=...
 YOUTUBE_INNERTUBE_API_KEY=...
-YOUTUBE_YTDLP_EXTERNAL_URL=http://localhost:8081
-```
-
-If you open the app from another machine, replace `localhost` in `YOUTUBE_YTDLP_EXTERNAL_URL` with the Docker host name or IP that the browser can reach. For example, if the app is opened as `http://lab:3000`, use:
-
-```sh
-YOUTUBE_YTDLP_EXTERNAL_URL=http://lab:8081
 ```
 
 Then start it:
@@ -152,12 +130,6 @@ Backend tests, without requiring a local Gradle install:
 docker compose up -d --build
 # or
 docker run --rm -v "$PWD/backend:/app" -w /app gradle:8.10.2-jdk17 gradle test --no-daemon
-```
-
-Python syntax:
-
-```sh
-python3 -m py_compile yt-dlp-server/server.py
 ```
 
 ## Security Notes

@@ -121,6 +121,10 @@
 
           <section class="watch-page hidden" data-route-section="watch">
             <article class="watch-player-panel" aria-labelledby="watch-title">
+              <div class="watch-header">
+                <h2 id="watch-title">Watch</h2>
+                <p id="watch-channel" class="meta-text watch-channel"></p>
+              </div>
               <div class="video-container">
                 <video id="video-player" controls playsinline crossorigin="anonymous"></video>
                 <div id="skip-indicator" class="skip-indicator hidden">
@@ -129,10 +133,7 @@
               </div>
 
               <div class="watch-details">
-                <h1 id="watch-title">Watch</h1>
-                <p id="watch-channel" class="meta-text"></p>
-                <p id="watch-metadata" class="meta-text"></p>
-                <p id="video-meta" class="meta-text"></p>
+                <p id="video-meta" class="meta-text hidden"></p>
                 <div class="watch-actions">
                   <label class="quality-field" for="quality-select">
                     <span class="sr-only">Quality</span>
@@ -140,6 +141,7 @@
                       <option value="bestvideo+bestaudio/best" selected>Best available</option>
                     </select>
                   </label>
+                  <a id="youtube-open-link" class="ghost-button watch-link-button" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">Open on YouTube</a>
                   <button id="watch-later-toggle" class="ghost-button" type="button" data-action="add">Save to Watch Later</button>
                 </div>
               </div>
@@ -150,6 +152,7 @@
       </div>
     </main>
 
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

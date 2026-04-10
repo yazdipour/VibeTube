@@ -1,17 +1,6 @@
 name: vibetube
 
 services:
-  yt-dlp:
-    image: ${VIBETUBE_YTDLP_IMAGE:-vibetube-ytdlp:local}
-    build:
-      context: ./yt-dlp-server
-    container_name: vibetube-ytdlp
-    ports:
-      - "8081:8081"
-    networks:
-      - vibetube
-    restart: unless-stopped
-
   backend:
     image: ${VIBETUBE_BACKEND_IMAGE:-vibetube-backend:local}
     build:
@@ -21,7 +10,6 @@ services:
       YOUTUBE_DATA_DIR: /data
       YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID:-}
       YOUTUBE_OAUTH_CLIENT_SECRET: ${YOUTUBE_OAUTH_CLIENT_SECRET:-}
-      YOUTUBE_YTDLP_EXTERNAL_URL: ${YOUTUBE_YTDLP_EXTERNAL_URL:-http://localhost:8081}
       YOUTUBE_INNERTUBE_API_KEY: ${YOUTUBE_INNERTUBE_API_KEY:-}
     ports:
       - "8080:8080"
@@ -29,8 +17,6 @@ services:
       - backend-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - yt-dlp
     networks:
       - vibetube
 
@@ -52,4 +38,3 @@ networks:
 
 volumes:
   backend-data:
-  ytdlp-cache:

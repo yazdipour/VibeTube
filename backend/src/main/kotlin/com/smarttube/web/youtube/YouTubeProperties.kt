@@ -8,6 +8,5 @@ data class YouTubeProperties(
     val activateUrl: String = "https://www.youtube.com/activate",
     val oauthClientId: String? = null,
     val oauthClientSecret: String? = null,
-    val ytdlpExternalUrl: String? = null,
     val innertubeApiKey: String? = null,
 )

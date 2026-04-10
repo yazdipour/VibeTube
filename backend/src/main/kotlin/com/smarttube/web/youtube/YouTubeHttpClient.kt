@@ -38,15 +38,19 @@ class YouTubeHttpClient(
         objectMapper.readTree(getText(url, headers))
 
     fun getBytes(url: String, headers: Map<String, String> = emptyMap()): Pair<ByteArray, String?> {
+        val response = getBytesResponse(url, headers)
+        ensureSuccess(response.statusCode(), "GET", url)
+        return response.body() to response.headers().firstValue("Content-Type").orElse(null)
+    }
+
+    fun getBytesResponse(url: String, headers: Map<String, String> = emptyMap()): HttpResponse<ByteArray> {
         val requestBuilder = HttpRequest.newBuilder(URI.create(url))
             .timeout(Duration.ofSeconds(30))
             .GET()
 
         headers.forEach(requestBuilder::header)
 
-        val response = sendBytes(requestBuilder.build())
-        ensureSuccess(response.statusCode(), "GET", url)
-        return response.body() to response.headers().firstValue("Content-Type").orElse(null)
+        return sendBytes(requestBuilder.build())
     }
 
     fun postJson(url: String, body: Any, headers: Map<String, String> = emptyMap()): JsonNode {

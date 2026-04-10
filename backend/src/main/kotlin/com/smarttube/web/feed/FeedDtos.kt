@@ -9,6 +9,7 @@ data class FeedVideoDto(
     val thumbnailUrl: String,
     val durationLabel: String?,
     val metadataLabel: String?,
+    val percentWatched: Int?,
 )
 
 data class FeedVideoListResponse(

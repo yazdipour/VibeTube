@@ -30,4 +30,5 @@ internal fun YouTubeVideoCard.toDto() = FeedVideoDto(
     thumbnailUrl = thumbnailUrl,
     durationLabel = durationLabel,
     metadataLabel = metadataLabel,
+    percentWatched = percentWatched,
 )

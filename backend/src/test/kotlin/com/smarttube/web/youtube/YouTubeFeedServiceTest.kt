@@ -22,7 +22,14 @@ class YouTubeFeedServiceTest {
                     "shortBylineText": { "runs": [{ "text": "Playlist channel" }] },
                     "thumbnail": { "thumbnails": [{ "url": "https://img/low.jpg" }, { "url": "https://img/high.jpg" }] },
                     "lengthText": { "simpleText": "4:20" },
-                    "publishedTimeText": { "simpleText": "Yesterday" }
+                    "publishedTimeText": { "simpleText": "Yesterday" },
+                    "thumbnailOverlays": [
+                      {
+                        "thumbnailOverlayResumePlaybackRenderer": {
+                          "percentDurationWatched": 37
+                        }
+                      }
+                    ]
                   }
                 }
               ]
@@ -38,6 +45,7 @@ class YouTubeFeedServiceTest {
                 thumbnailUrl = "https://img/high.jpg",
                 durationLabel = "4:20",
                 metadataLabel = "Yesterday",
+                percentWatched = 37,
             ),
         )
     }
@@ -79,6 +87,11 @@ class YouTubeFeedServiceTest {
                         "thumbnailOverlayTimeStatusRenderer": {
                           "text": { "simpleText": "8:10" }
                         }
+                      },
+                      {
+                        "thumbnailOverlayResumePlaybackRenderer": {
+                          "percentDurationWatched": 42
+                        }
                       }
                     ]
                   }
@@ -96,6 +109,7 @@ class YouTubeFeedServiceTest {
                 thumbnailUrl = "https://img/tile.jpg",
                 durationLabel = "8:10",
                 metadataLabel = "1K views 2 days ago",
+                percentWatched = 42,
             ),
         )
     }
@@ -123,6 +137,13 @@ class YouTubeFeedServiceTest {
                         }
                       }
                     ]
+                  }
+                },
+                "thumbnailBottomOverlayViewModel": {
+                  "progressBar": {
+                    "thumbnailOverlayProgressBarViewModel": {
+                      "startPercent": 58
+                    }
                   }
                 },
                 "metadata": {
@@ -169,6 +190,7 @@ class YouTubeFeedServiceTest {
                 thumbnailUrl = "https://img.youtube.com/high.jpg",
                 durationLabel = "12:34",
                 metadataLabel = "42K views • 3 weeks ago",
+                percentWatched = 58,
             ),
         )
     }
