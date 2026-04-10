@@ -569,6 +569,62 @@ button { font: inherit; }
   gap: 6px;
 }
 
+.skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-card:hover {
+  transform: none;
+  box-shadow: var(--card-shadow);
+}
+
+.skeleton-block,
+.skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: #1c1c1c;
+}
+
+.skeleton-block::after,
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-thumb {
+  aspect-ratio: 16 / 9;
+}
+
+.skeleton-line {
+  border-radius: 999px;
+}
+
+.skeleton-title {
+  height: 18px;
+  width: 88%;
+}
+
+.skeleton-meta {
+  height: 14px;
+  width: 52%;
+  margin-top: 4px;
+}
+
+.skeleton-subtitle {
+  height: 14px;
+  width: 64%;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .video-card-title {
   margin: 0;
   font-size: 1.05rem;

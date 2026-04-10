@@ -305,6 +305,39 @@ function renderEmpty(target, message, isError = false) {
   target.append(element);
 }
 
+function createVideoSkeletonCard() {
+  const card = document.createElement("article");
+  card.className = "video-card skeleton-card";
+  card.setAttribute("aria-hidden", "true");
+
+  const thumb = document.createElement("div");
+  thumb.className = "video-card-thumb skeleton-block skeleton-thumb";
+
+  const body = document.createElement("div");
+  body.className = "video-card-body";
+
+  const title = document.createElement("div");
+  title.className = "skeleton-line skeleton-title";
+
+  const meta = document.createElement("div");
+  meta.className = "skeleton-line skeleton-meta";
+
+  const subtitle = document.createElement("div");
+  subtitle.className = "skeleton-line skeleton-subtitle";
+
+  body.append(title, meta, subtitle);
+  card.append(thumb, body);
+  return card;
+}
+
+function renderVideoGridSkeleton(target, count = 12) {
+  target.replaceChildren();
+
+  for (let index = 0; index < count; index += 1) {
+    target.append(createVideoSkeletonCard());
+  }
+}
+
 function loadWatchProgress() {
   try {
     const raw = window.localStorage.getItem("vibetube.watch-progress");
@@ -771,6 +804,8 @@ async function loadAuth() {
 
 async function renderHomeFeed(options = {}) {
   pageTitle.textContent = "Home";
+  setMetaText(pageMeta, "Loading Home...");
+  renderVideoGridSkeleton(browseGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.home, {
@@ -792,6 +827,8 @@ async function renderHomeFeed(options = {}) {
 
 async function renderSubscriptionFeed(options = {}) {
   pageTitle.textContent = "Subscriptions";
+  setMetaText(pageMeta, "Loading Subscriptions...");
+  renderVideoGridSkeleton(browseGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.subscriptionFeed, {
@@ -823,6 +860,9 @@ async function renderSearchResults(query, options = {}) {
     renderVideoGrid(browseGrid, [], "Enter a search query.");
     return false;
   }
+
+  setMetaText(pageMeta, "Loading search results...");
+  renderVideoGridSkeleton(browseGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.search(normalizedQuery), {
@@ -888,6 +928,8 @@ async function renderChannelVideos(channelId, options = {}) {
   const cachedChannel = appState.channelItems.find((item) => item.channelId === channelId);
   const channelName = cachedChannel?.channelName || "Channel";
   pageTitle.textContent = channelName;
+  setMetaText(pageMeta, `Loading ${channelName}...`);
+  renderVideoGridSkeleton(browseGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.channelVideos(channelId), {
@@ -907,6 +949,8 @@ async function renderChannelVideos(channelId, options = {}) {
 
 async function renderWatchLater(options = {}) {
   pageTitle.textContent = "Watch Later";
+  setMetaText(pageMeta, "Loading Watch Later...");
+  renderVideoGridSkeleton(browseGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.watchLater, {
@@ -930,6 +974,8 @@ async function renderWatchLater(options = {}) {
 
 async function renderPlaylistVideos(playlistId, options = {}) {
   playlistTitle.textContent = "Playlist";
+  setMetaText(playlistMeta, "Loading playlist...");
+  renderVideoGridSkeleton(playlistGrid);
 
   try {
     const payload = await fetchCachedJson(endpoints.playlist(playlistId), {
