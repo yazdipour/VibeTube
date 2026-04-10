@@ -63,7 +63,7 @@ name: vibetube
 
 services:
   backend:
-    image: ghcr.io/yazdipour/vibetube-backend:0.0.1
+    image: ghcr.io/yazdipour/vibetube-backend:latest
     container_name: vibetube-backend
     environment:
       YOUTUBE_DATA_DIR: /data
@@ -78,7 +78,7 @@ services:
       - vibetube
 
   frontend:
-    image: ghcr.io/yazdipour/vibetube-frontend:0.0.1
+    image: ghcr.io/yazdipour/vibetube-frontend:latest
     container_name: vibetube-frontend
     depends_on:
       - backend

@@ -54,7 +54,9 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
-          tags: ghcr.io/${{ steps.meta.outputs.repository }}-${{ matrix.image_suffix }}:${{ steps.meta.outputs.version }}
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.repository }}-${{ matrix.image_suffix }}:${{ steps.meta.outputs.version }}
+            ghcr.io/${{ steps.meta.outputs.repository }}-${{ matrix.image_suffix }}:latest
           labels: |
             org.opencontainers.image.title=VibeTube ${{ matrix.component }}
             org.opencontainers.image.description=VibeTube ${{ matrix.component }} container
