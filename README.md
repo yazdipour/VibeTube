@@ -2,6 +2,11 @@
 
 VibeTube is a self-hosted web app for browsing and watching YouTube content.
 
+> [!IMPORTANT]  
+> Basically, it's a vibe coded Youtube Client Clone inspired by SmartTube and its features; built for personal use and local hosting. 
+
+![Home page screenshot](./docs/home.jpg)
+
 It includes:
 
 - Home, Subscriptions, Channels, Library, Watch Later, and Search pages
