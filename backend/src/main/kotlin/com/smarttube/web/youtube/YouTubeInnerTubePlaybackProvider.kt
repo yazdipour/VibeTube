@@ -150,6 +150,12 @@ class YouTubeInnerTubePlaybackProvider(
                         initRange = candidate.initRange,
                         indexRange = candidate.indexRange,
                         audioSampleRate = candidate.audioSampleRate,
+                        audioTrackDisplayName = candidate.audioTrackDisplayName,
+                        audioTrackId = candidate.audioTrackId,
+                        audioIsDefault = candidate.audioIsDefault,
+                        isAutoDubbed = candidate.isAutoDubbed,
+                        isDrc = candidate.isDrc,
+                        xtags = candidate.xtags,
                     )
                     }
 
@@ -310,6 +316,12 @@ class YouTubeInnerTubePlaybackProvider(
                             initRange = candidate.initRange,
                             indexRange = candidate.indexRange,
                             audioSampleRate = candidate.audioSampleRate,
+                            audioTrackDisplayName = candidate.audioTrackDisplayName,
+                            audioTrackId = candidate.audioTrackId,
+                            audioIsDefault = candidate.audioIsDefault,
+                            isAutoDubbed = candidate.isAutoDubbed,
+                            isDrc = candidate.isDrc,
+                            xtags = candidate.xtags,
                         )
                     }
                 resolved
@@ -513,7 +525,7 @@ private fun JsonNode.toParsedInnerTubePlayer(playerMetadata: PlayerMetadata? = n
         streamingData.path("formats").toStreamingFormatCandidates() +
             streamingData.path("adaptiveFormats").toStreamingFormatCandidates()
         )
-        .distinctBy { "${it.itag}:${it.qualityLabel}:${it.mimeType}" }
+        .distinctBy { "${it.itag}:${it.qualityLabel}:${it.mimeType}:${it.audioTrackId ?: ""}:${it.xtags ?: ""}:${it.url ?: it.signatureCipher ?: it.cipher ?: ""}" }
 
     return ParsedInnerTubePlayer(
         title = path("videoDetails").path("title").asText(null),
@@ -565,6 +577,12 @@ private fun JsonNode.toStreamingFormatCandidates(): List<StreamingFormatCandidat
             initRange = format.path("initRange").toByteRange(),
             indexRange = format.path("indexRange").toByteRange(),
             audioSampleRate = format.path("audioSampleRate").asText("").toIntOrNull(),
+            audioTrackDisplayName = format.path("audioTrack").path("displayName").asText("").ifBlank { null },
+            audioTrackId = format.path("audioTrack").path("id").asText("").ifBlank { null },
+            audioIsDefault = format.path("audioTrack").path("audioIsDefault").asBoolean(false),
+            isAutoDubbed = format.path("audioTrack").path("isAutoDubbed").asBoolean(false),
+            isDrc = format.path("isDrc").asBoolean(false),
+            xtags = format.path("xtags").asText("").ifBlank { null },
         )
     }
 }
@@ -726,7 +744,27 @@ private fun selectAdaptiveVideoFormats(formats: List<ResolvedFormatCandidate>): 
 private fun selectAdaptiveAudioFormat(formats: List<ResolvedFormatCandidate>): ResolvedFormatCandidate? =
     formats
         .filter { it.hasAudio && !it.hasVideo && it.mimeType.startsWith("audio/mp4") && it.initRange != null && it.indexRange != null }
-        .maxByOrNull { it.bitrate }
+        .let { audioFormats ->
+            val preferredDefaultOriginal = audioFormats.filter {
+                it.url.contains("acont%3Doriginal") ||
+                    it.url.contains("acont=original") ||
+                    (it.audioIsDefault && !it.isAutoDubbed)
+            }
+            val preferredOriginal = preferredDefaultOriginal.ifEmpty {
+                audioFormats.filter {
+                    !it.url.contains("dubbed-auto") &&
+                        !it.url.contains("lang%3Dde-DE") &&
+                        !it.url.contains("lang=de-DE") &&
+                        !it.isAutoDubbed
+                }
+            }
+            val pool = preferredOriginal.ifEmpty { audioFormats }
+            pool.sortedWith(
+                compareBy<ResolvedFormatCandidate> { it.isDrc }
+                    .thenByDescending { it.audioSampleRate ?: 0 }
+                    .thenByDescending { it.bitrate },
+            ).firstOrNull()
+        }
 
 private fun buildDashManifestXml(
     videoId: String,

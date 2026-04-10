@@ -50,6 +50,12 @@ internal class YouTubePlayerScriptService(
             initRange = candidate.initRange,
             indexRange = candidate.indexRange,
             audioSampleRate = candidate.audioSampleRate,
+            audioTrackDisplayName = candidate.audioTrackDisplayName,
+            audioTrackId = candidate.audioTrackId,
+            audioIsDefault = candidate.audioIsDefault,
+            isAutoDubbed = candidate.isAutoDubbed,
+            isDrc = candidate.isDrc,
+            xtags = candidate.xtags,
         )
     }
 
@@ -116,6 +122,12 @@ internal data class StreamingFormatCandidate(
     val initRange: ByteRange?,
     val indexRange: ByteRange?,
     val audioSampleRate: Int?,
+    val audioTrackDisplayName: String?,
+    val audioTrackId: String?,
+    val audioIsDefault: Boolean,
+    val isAutoDubbed: Boolean,
+    val isDrc: Boolean,
+    val xtags: String?,
 )
 
 internal data class ResolvedFormatCandidate(
@@ -134,6 +146,12 @@ internal data class ResolvedFormatCandidate(
     val initRange: ByteRange?,
     val indexRange: ByteRange?,
     val audioSampleRate: Int?,
+    val audioTrackDisplayName: String?,
+    val audioTrackId: String?,
+    val audioIsDefault: Boolean,
+    val isAutoDubbed: Boolean,
+    val isDrc: Boolean,
+    val xtags: String?,
 )
 
 internal data class ByteRange(

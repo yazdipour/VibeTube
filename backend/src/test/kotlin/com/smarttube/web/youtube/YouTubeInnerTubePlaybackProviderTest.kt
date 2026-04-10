@@ -100,6 +100,12 @@ class YouTubeInnerTubePlaybackProviderTest {
                 initRange = null,
                 indexRange = null,
                 audioSampleRate = null,
+                audioTrackDisplayName = null,
+                audioTrackId = null,
+                audioIsDefault = false,
+                isAutoDubbed = false,
+                isDrc = false,
+                xtags = null,
             ),
         )
 
