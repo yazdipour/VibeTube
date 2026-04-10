@@ -41,6 +41,7 @@ data class VideoStreamInfo(
     val videoId: String,
     val title: String,
     val author: String,
+    val channelId: String?,
     val lengthSeconds: Int,
     val streamUrl: String,
     val hlsManifestUrl: String?,

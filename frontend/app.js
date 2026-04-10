@@ -62,6 +62,7 @@ const appState = {
   watchLaterItems: [],
   watchLaterSupported: true,
   currentVideoId: null,
+  currentChannelId: null,
   currentFormat: "bestvideo+bestaudio/best",
   apiCache: new Map(),
   watchProgress: loadWatchProgress(),
@@ -115,6 +116,10 @@ function setMetaText(element, text) {
 
 function youtubeWatchUrl(videoId) {
   return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+}
+
+function channelRoute(channelId) {
+  return `#/channels/${encodeURIComponent(channelId)}`;
 }
 
 async function fetchJson(url, options = {}) {
@@ -1294,6 +1299,7 @@ function findPreferredFormat(formats) {
 
 async function renderWatchPage(videoId, formatOverride) {
   appState.currentVideoId = videoId;
+  appState.currentChannelId = null;
   appState.currentFormat = formatOverride || appState.currentFormat;
   lastProgressSaveAt = 0;
   if (youtubeOpenLink) {
@@ -1301,6 +1307,7 @@ async function renderWatchPage(videoId, formatOverride) {
   }
   watchTitle.textContent = "Loading video...";
   setMetaText(watchChannel, "");
+  watchChannel.disabled = true;
   setMetaText(videoMeta, "");
   setBanner(`Loading video ${videoId}...`);
 
@@ -1321,13 +1328,17 @@ async function renderWatchPage(videoId, formatOverride) {
 
     watchTitle.textContent = videoData.title || formatsPayload?.title || "Video";
     setMetaText(watchChannel, videoData.author || formatsPayload?.author || "Unknown channel");
+    appState.currentChannelId = videoData.channelId || null;
+    watchChannel.disabled = !appState.currentChannelId;
     setMetaText(videoMeta, "");
     updateWatchLaterButton(videoId);
     setBanner("Video loaded.");
     return true;
   } catch (error) {
     watchTitle.textContent = "Watch";
+    appState.currentChannelId = null;
     setMetaText(watchChannel, "");
+    watchChannel.disabled = true;
     setMetaText(videoMeta, "");
     setBanner(`Failed to load video: ${error.message}`, true);
     return false;
@@ -1412,6 +1423,11 @@ authActionButton?.addEventListener("click", toggleAuthAction);
 qualitySelect?.addEventListener("change", async () => {
   if (appState.currentVideoId) {
     await renderWatchPage(appState.currentVideoId, qualitySelect.value);
+  }
+});
+watchChannel?.addEventListener("click", () => {
+  if (appState.currentChannelId) {
+    navigateTo(channelRoute(appState.currentChannelId));
   }
 });
 videoPlayer?.addEventListener("ended", () => {

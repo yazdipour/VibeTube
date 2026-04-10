@@ -40,6 +40,7 @@ class YouTubeInnerTubePlaybackProvider(
             videoId = videoId,
             title = player.title ?: "Unknown",
             author = player.author ?: "Unknown",
+            channelId = player.channelId,
             lengthSeconds = player.lengthSeconds ?: 0,
             streamUrl = streamUrl,
             hlsManifestUrl = if (useAutoHls) player.hlsManifestUrl else null,
@@ -484,6 +485,7 @@ private data class CachedPlayerScript(
 private data class ParsedInnerTubePlayer(
     val title: String?,
     val author: String?,
+    val channelId: String?,
     val lengthSeconds: Int?,
     val playabilityStatus: String?,
     val playabilityReason: String?,
@@ -530,6 +532,7 @@ private fun JsonNode.toParsedInnerTubePlayer(playerMetadata: PlayerMetadata? = n
     return ParsedInnerTubePlayer(
         title = path("videoDetails").path("title").asText(null),
         author = path("videoDetails").path("author").asText(null),
+        channelId = path("videoDetails").path("channelId").asText(null)?.ifBlank { null },
         lengthSeconds = path("videoDetails").path("lengthSeconds").asText("").toIntOrNull(),
         playabilityStatus = path("playabilityStatus").path("status").asText(null),
         playabilityReason = path("playabilityStatus").path("reason").asText(null),

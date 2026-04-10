@@ -58,6 +58,7 @@ class YouTubeVideoServiceTest {
         videoId = "abc123",
         title = "video",
         author = "author",
+        channelId = "channel123",
         lengthSeconds = 123,
         streamUrl = "https://example.com/master.m3u8",
         hlsManifestUrl = "https://example.com/master.m3u8",
