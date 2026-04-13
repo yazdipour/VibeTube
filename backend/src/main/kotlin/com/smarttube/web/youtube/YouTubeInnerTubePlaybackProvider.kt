@@ -19,19 +19,23 @@ class YouTubeInnerTubePlaybackProvider(
     private val globalPlayerMetadataCache = ConcurrentHashMap<String, CachedPlayerMetadata>()
 
     override fun getVideoStreamUrl(videoId: String, formatSelector: String): VideoStreamInfo? {
-        val player = fetchPlayer(videoId)
+        val players = fetchPlayers(videoId)
+        val player = selectBestPlayer(players) ?: return null
         val adaptiveManifest = buildAdaptiveDashManifest(videoId, player)
         val formats = resolveFormats(player, adaptiveManifest)
         val selectedFormat = resolveRequestedFormat(formats, formatSelector)
-        val useAutoHls = formatSelector == DEFAULT_FORMAT_SELECTOR &&
-            adaptiveManifest == null &&
-            selectedFormat == null &&
-            player.hlsManifestUrl != null
+        val hasHlsFormats = formats.any { it.mimeType.contains("mpegurl", ignoreCase = true) }
+        val selectedDashItag = selectedFormat
+            ?.takeIf { it.mimeType == "application/dash+xml" }
+            ?.itag
+        val useHls = player.hlsManifestUrl != null && hasHlsFormats
         val useDash = adaptiveManifest != null &&
+            !useHls &&
             (formatSelector == DEFAULT_FORMAT_SELECTOR || selectedFormat != null)
         val streamUrl = when {
+            useHls -> player.hlsManifestUrl
+            useDash && selectedDashItag != null -> "/api/videos/$videoId/manifest.mpd?itag=$selectedDashItag"
             useDash -> "/api/videos/$videoId/manifest.mpd"
-            useAutoHls -> player.hlsManifestUrl
             selectedFormat != null -> selectedFormat.url
             else -> player.hlsManifestUrl
         } ?: return null
@@ -43,7 +47,7 @@ class YouTubeInnerTubePlaybackProvider(
             channelId = player.channelId,
             lengthSeconds = player.lengthSeconds ?: 0,
             streamUrl = streamUrl,
-            hlsManifestUrl = if (useAutoHls) player.hlsManifestUrl else null,
+            hlsManifestUrl = player.hlsManifestUrl,
             dashManifestUrl = adaptiveManifest?.let { "/api/videos/$videoId/manifest.mpd" },
             formats = formats,
             subtitles = player.subtitles,
@@ -51,7 +55,7 @@ class YouTubeInnerTubePlaybackProvider(
     }
 
     override fun getAvailableFormats(videoId: String): VideoFormatsInfo? {
-        val player = fetchPlayer(videoId)
+        val player = selectBestPlayer(fetchPlayers(videoId)) ?: return null
         val formats = resolveFormats(player, buildAdaptiveDashManifest(videoId, player))
         if (formats.isEmpty()) {
             return null
@@ -66,10 +70,26 @@ class YouTubeInnerTubePlaybackProvider(
         )
     }
 
-    override fun getDashManifest(videoId: String): String? {
-        val player = fetchPlayer(videoId)
-        return buildAdaptiveDashManifest(videoId, player)?.manifest
+    override fun getDashManifest(videoId: String, videoItag: Int?): String? {
+        val player = selectBestPlayer(fetchPlayers(videoId)) ?: return null
+        return buildAdaptiveDashManifest(videoId, player, videoItag)?.manifest
     }
+
+    override fun getAdaptiveStreamUrl(videoId: String, itag: Int): String? {
+        return getAdaptiveStreamUrls(videoId, itag).firstOrNull()
+    }
+
+    override fun getAdaptiveStreamUrls(videoId: String, itag: Int): List<String> =
+        fetchPlayers(videoId)
+            .asSequence()
+            .flatMap { player ->
+                resolveAdaptiveCandidates(player)
+                    .asSequence()
+                    .filter { it.itag == itag }
+                    .map { it.url }
+            }
+            .distinct()
+            .toList()
 
     override fun getSubtitleContent(captionUrl: String): String =
         httpClient.getText(
@@ -80,7 +100,7 @@ class YouTubeInnerTubePlaybackProvider(
             ),
         )
 
-    private fun fetchPlayer(videoId: String): ParsedInnerTubePlayer {
+    private fun fetchPlayers(videoId: String): List<ParsedInnerTubePlayer> {
         val apiKey = properties.innertubeApiKey?.takeIf { it.isNotBlank() }
             ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YOUTUBE_INNERTUBE_API_KEY is not set.")
         val url = httpClient.buildUrl(
@@ -114,7 +134,9 @@ class YouTubeInnerTubePlaybackProvider(
             failureMessage = parsed.failureMessage(client.clientName)
         }
 
-        selectBestPlayer(playablePlayers)?.let { return it }
+        if (playablePlayers.isNotEmpty()) {
+            return playablePlayers
+        }
 
         throw ResponseStatusException(
             HttpStatus.BAD_GATEWAY,
@@ -123,6 +145,18 @@ class YouTubeInnerTubePlaybackProvider(
     }
 
     private fun resolveFormats(player: ParsedInnerTubePlayer, adaptiveManifest: AdaptiveDashManifest?): List<VideoFormat> {
+        val hlsManifestUrl = player.hlsManifestUrl
+        if (!hlsManifestUrl.isNullOrBlank()) {
+            val manifestText = httpClient.getText(
+                hlsManifestUrl,
+                headers = mapOf("User-Agent" to IOS_USER_AGENT),
+            )
+            val hlsFormats = parseHlsFormats(hlsManifestUrl, manifestText)
+            if (hlsFormats.isNotEmpty()) {
+                return hlsFormats
+            }
+        }
+
         if (adaptiveManifest != null) {
             return adaptiveManifest.formats
         }
@@ -173,18 +207,6 @@ class YouTubeInnerTubePlaybackProvider(
         if (progressiveFormats.isNotEmpty()) {
             return progressiveFormats
                 .distinctBy { extractHeight(it.qualityLabel).takeIf { height -> height > 0 } ?: it.formatId }
-        }
-
-        val hlsManifestUrl = player.hlsManifestUrl
-        if (!hlsManifestUrl.isNullOrBlank()) {
-            val manifestText = httpClient.getText(
-                hlsManifestUrl,
-                headers = mapOf("User-Agent" to IOS_USER_AGENT),
-            )
-            val hlsFormats = parseHlsFormats(hlsManifestUrl, manifestText)
-            if (hlsFormats.isNotEmpty()) {
-                return hlsFormats
-            }
         }
 
         return emptyList()
@@ -282,53 +304,22 @@ class YouTubeInnerTubePlaybackProvider(
         players.maxWithOrNull(
             compareBy<ParsedInnerTubePlayer> { player ->
                 when {
+                    !player.hlsManifestUrl.isNullOrBlank() -> 4
                     player.formats.any { it.hasAudio && it.hasVideo && it.mimeType.contains("mp4") } -> 3
                     player.formats.any { it.hasAudio && it.hasVideo } -> 2
-                    !player.hlsManifestUrl.isNullOrBlank() -> 1
                     else -> 0
                 }
             }.thenBy { player ->
-                player.hlsManifestUrl == null
+                player.formats.any { it.hasAudio && it.hasVideo && it.mimeType.contains("mp4") }
             },
         )
 
-    private fun buildAdaptiveDashManifest(videoId: String, player: ParsedInnerTubePlayer): AdaptiveDashManifest? {
-        val resolvedFormats = player.formats
-            .mapNotNull { candidate ->
-                val resolved = player.playerMetadata?.playerUrl
-                    ?.let(::loadPlayerScript)
-                    ?.jsCode
-                    ?.let(::YouTubePlayerScriptService)
-                    ?.resolveFormat(candidate)
-                    ?: candidate.url?.let {
-                        ResolvedFormatCandidate(
-                            url = it,
-                            mimeType = candidate.mimeType,
-                            itag = candidate.itag,
-                            qualityLabel = candidate.qualityLabel,
-                            bitrate = candidate.bitrate,
-                            hasAudio = candidate.hasAudio,
-                            hasVideo = candidate.hasVideo,
-                            width = candidate.width,
-                            height = candidate.height,
-                            fps = candidate.fps,
-                            contentLength = candidate.contentLength,
-                            approxDurationMs = candidate.approxDurationMs,
-                            initRange = candidate.initRange,
-                            indexRange = candidate.indexRange,
-                            audioSampleRate = candidate.audioSampleRate,
-                            audioTrackDisplayName = candidate.audioTrackDisplayName,
-                            audioTrackId = candidate.audioTrackId,
-                            audioIsDefault = candidate.audioIsDefault,
-                            isAutoDubbed = candidate.isAutoDubbed,
-                            isDrc = candidate.isDrc,
-                            xtags = candidate.xtags,
-                        )
-                    }
-                resolved
-            }
-
+    private fun buildAdaptiveDashManifest(videoId: String, player: ParsedInnerTubePlayer, selectedVideoItag: Int? = null): AdaptiveDashManifest? {
+        val resolvedFormats = resolveAdaptiveCandidates(player)
         val videoFormats = selectAdaptiveVideoFormats(resolvedFormats)
+            .let { formats ->
+                selectedVideoItag?.let { itag -> formats.filter { it.itag == itag } } ?: formats
+            }
         val audioFormat = selectAdaptiveAudioFormat(resolvedFormats)
         if (videoFormats.isEmpty() || audioFormat == null) {
             return null
@@ -348,6 +339,41 @@ class YouTubeInnerTubePlaybackProvider(
 
         return AdaptiveDashManifest(manifest = manifest, formats = formats)
     }
+
+    private fun resolveAdaptiveCandidates(player: ParsedInnerTubePlayer): List<ResolvedFormatCandidate> =
+        player.formats.mapNotNull { candidate ->
+            val resolved = player.playerMetadata?.playerUrl
+                ?.let(::loadPlayerScript)
+                ?.jsCode
+                ?.let(::YouTubePlayerScriptService)
+                ?.resolveFormat(candidate)
+                ?: candidate.url?.let {
+                    ResolvedFormatCandidate(
+                        url = it,
+                        mimeType = candidate.mimeType,
+                        itag = candidate.itag,
+                        qualityLabel = candidate.qualityLabel,
+                        bitrate = candidate.bitrate,
+                        hasAudio = candidate.hasAudio,
+                        hasVideo = candidate.hasVideo,
+                        width = candidate.width,
+                        height = candidate.height,
+                        fps = candidate.fps,
+                        contentLength = candidate.contentLength,
+                        approxDurationMs = candidate.approxDurationMs,
+                        initRange = candidate.initRange,
+                        indexRange = candidate.indexRange,
+                        audioSampleRate = candidate.audioSampleRate,
+                        audioTrackDisplayName = candidate.audioTrackDisplayName,
+                        audioTrackId = candidate.audioTrackId,
+                        audioIsDefault = candidate.audioIsDefault,
+                        isAutoDubbed = candidate.isAutoDubbed,
+                        isDrc = candidate.isDrc,
+                        xtags = candidate.xtags,
+                    )
+                }
+            resolved
+        }
 
     private data class ClientProfile(
         val clientName: String,
@@ -643,7 +669,8 @@ internal fun extractSignatureTimestamp(jsCode: String): String? =
 
 internal fun parseHlsFormats(manifestUrl: String, manifestText: String): List<VideoFormat> {
     val lines = manifestText.lineSequence().map { it.trim() }.toList()
-    val variants = mutableListOf<VideoFormat>()
+    val preferredAudioGroups = selectPreferredHlsAudioGroups(lines)
+    val variants = mutableListOf<HlsVariantCandidate>()
 
     var index = 0
     while (index < lines.size) {
@@ -654,12 +681,17 @@ internal fun parseHlsFormats(manifestUrl: String, manifestText: String): List<Vi
         }
 
         val attributes = parseM3uAttributes(line.removePrefix("#EXT-X-STREAM-INF:"))
+        val audioGroup = attributes["AUDIO"]
         var targetIndex = index + 1
         while (targetIndex < lines.size && lines[targetIndex].startsWith("#")) {
             targetIndex += 1
         }
         if (targetIndex >= lines.size) {
             break
+        }
+        if (preferredAudioGroups.isNotEmpty() && audioGroup != null && audioGroup !in preferredAudioGroups) {
+            index = targetIndex + 1
+            continue
         }
 
         val playlistPath = lines[targetIndex]
@@ -670,24 +702,93 @@ internal fun parseHlsFormats(manifestUrl: String, manifestText: String): List<Vi
         val bandwidth = attributes["AVERAGE-BANDWIDTH"]?.toLongOrNull()
             ?: attributes["BANDWIDTH"]?.toLongOrNull()
             ?: 0L
-        variants += VideoFormat(
-            formatId = qualityLabel,
-            itag = height,
-            url = resolvedUrl,
-            mimeType = "application/x-mpegURL",
-            qualityLabel = qualityLabel,
-            bitrate = bandwidth,
+        variants += HlsVariantCandidate(
+            format = VideoFormat(
+                formatId = qualityLabel,
+                itag = height,
+                url = resolvedUrl,
+                mimeType = "application/x-mpegURL",
+                qualityLabel = qualityLabel,
+                bitrate = bandwidth,
+            ),
+            codecs = attributes["CODECS"].orEmpty(),
+            audioGroupId = audioGroup,
         )
         index = targetIndex + 1
     }
 
     return variants
-        .sortedWith(compareByDescending<VideoFormat> { extractHeight(it.qualityLabel) }.thenByDescending { it.bitrate })
-        .groupBy { it.qualityLabel }
+        .groupBy { it.format.qualityLabel }
         .values
-        .map { group -> group.maxByOrNull { it.bitrate }!! }
+        .mapNotNull { group ->
+            group.maxWithOrNull(
+                compareBy<HlsVariantCandidate> {
+                    hlsAudioGroupRank(it.audioGroupId, preferredAudioGroups)
+                }.thenBy {
+                    hlsVideoCodecRank(it.codecs)
+                }.thenBy {
+                    it.format.bitrate
+                },
+            )
+        }
+        .map { it.format }
         .sortedWith(compareByDescending<VideoFormat> { extractHeight(it.qualityLabel) }.thenByDescending { it.bitrate })
 }
+
+private data class HlsVariantCandidate(
+    val format: VideoFormat,
+    val codecs: String,
+    val audioGroupId: String?,
+)
+
+private fun selectPreferredHlsAudioGroups(lines: List<String>): Set<String> {
+    val audioTracks = lines
+        .filter { it.startsWith("#EXT-X-MEDIA:") }
+        .map { parseM3uAttributes(it.removePrefix("#EXT-X-MEDIA:")) }
+        .filter { it["TYPE"]?.uppercase() == "AUDIO" }
+
+    val originalGroups = audioTracks
+        .filter { hlsAudioTrackDescriptor(it).contains("original", ignoreCase = true) }
+        .mapNotNull { it["GROUP-ID"] }
+        .toSet()
+    if (originalGroups.isNotEmpty()) {
+        return originalGroups
+    }
+
+    val nonDubbedGroups = audioTracks
+        .filterNot { hlsAudioTrackDescriptor(it).contains("dubbed", ignoreCase = true) }
+        .mapNotNull { it["GROUP-ID"] }
+        .toSet()
+    if (nonDubbedGroups.isNotEmpty()) {
+        return nonDubbedGroups
+    }
+
+    return audioTracks.mapNotNull { it["GROUP-ID"] }.toSet()
+}
+
+private fun hlsAudioTrackDescriptor(attributes: Map<String, String>): String =
+    listOfNotNull(
+        attributes["NAME"],
+        attributes["LANGUAGE"],
+        attributes["YT-EXT-XTAGS"],
+        attributes["YT-EXT-AUDIO-CONTENT-ID"],
+    ).joinToString(" ")
+
+private fun hlsAudioGroupRank(groupId: String?, preferredAudioGroups: Set<String>): Int =
+    when {
+        preferredAudioGroups.isEmpty() -> 1
+        groupId != null && groupId in preferredAudioGroups -> 1
+        else -> 0
+    }
+
+private fun hlsVideoCodecRank(codecs: String): Int =
+    when {
+        codecs.contains("avc1", ignoreCase = true) -> 4
+        codecs.contains("hvc1", ignoreCase = true) || codecs.contains("hev1", ignoreCase = true) -> 3
+        codecs.contains("av01", ignoreCase = true) -> 2
+        codecs.contains("vp09", ignoreCase = true) -> 1
+        else -> 0
+    }
 
 private fun parseM3uAttributes(raw: String): Map<String, String> {
     val values = linkedMapOf<String, String>()
@@ -748,22 +849,33 @@ private fun selectAdaptiveAudioFormat(formats: List<ResolvedFormatCandidate>): R
     formats
         .filter { it.hasAudio && !it.hasVideo && it.mimeType.startsWith("audio/mp4") && it.initRange != null && it.indexRange != null }
         .let { audioFormats ->
-            val preferredDefaultOriginal = audioFormats.filter {
-                it.url.contains("acont%3Doriginal") ||
-                    it.url.contains("acont=original") ||
-                    (it.audioIsDefault && !it.isAutoDubbed)
+            val originalNonDubbed = audioFormats.filter {
+                !it.isAutoDubbed && (
+                    it.url.contains("acont%3Doriginal") ||
+                        it.url.contains("acont=original") ||
+                        it.xtags?.contains("acont=original") == true ||
+                        it.audioTrackDisplayName?.contains("original", ignoreCase = true) == true
+                    )
             }
-            val preferredOriginal = preferredDefaultOriginal.ifEmpty {
+            val preferredOriginal = originalNonDubbed.ifEmpty {
                 audioFormats.filter {
                     !it.url.contains("dubbed-auto") &&
                         !it.url.contains("lang%3Dde-DE") &&
-                        !it.url.contains("lang=de-DE") &&
                         !it.isAutoDubbed
                 }
             }
-            val pool = preferredOriginal.ifEmpty { audioFormats }
+            val nonDubbed = preferredOriginal.ifEmpty {
+                audioFormats.filter { !it.isAutoDubbed && !it.url.contains("dubbed-auto") }
+            }
+            val pool = nonDubbed.ifEmpty { audioFormats }
             pool.sortedWith(
                 compareBy<ResolvedFormatCandidate> { it.isDrc }
+                    .thenByDescending {
+                        it.audioTrackDisplayName?.contains("original", ignoreCase = true) == true ||
+                            it.xtags?.contains("acont=original") == true ||
+                            it.url.contains("acont%3Doriginal") ||
+                            it.url.contains("acont=original")
+                    }
                     .thenByDescending { it.audioSampleRate ?: 0 }
                     .thenByDescending { it.bitrate },
             ).firstOrNull()
@@ -783,7 +895,7 @@ private fun buildDashManifestXml(
     val videoRepresentations = videoFormats.joinToString("\n") { format ->
         """
         <Representation id="${format.itag}" bandwidth="${format.bitrate}" codecs="${xmlEscape(extractCodecs(format.mimeType))}" mimeType="video/mp4" width="${format.width ?: 0}" height="${format.height ?: extractHeight(format.qualityLabel)}"${format.fps?.let { " frameRate=\"$it\"" } ?: ""}>
-          <BaseURL>${xmlEscape("/api/videos/$videoId/media?url=${encodeXmlUrl(format.url)}")}</BaseURL>
+          <BaseURL>${xmlEscape("/api/videos/$videoId/adaptive/${format.itag}")}</BaseURL>
           <SegmentBase indexRange="${format.indexRange!!.start}-${format.indexRange!!.end}">
             <Initialization range="${format.initRange!!.start}-${format.initRange!!.end}"/>
           </SegmentBase>
@@ -792,7 +904,7 @@ private fun buildDashManifestXml(
     }
     val audioRepresentation = """
         <Representation id="${audioFormat.itag}" bandwidth="${audioFormat.bitrate}" codecs="${xmlEscape(extractCodecs(audioFormat.mimeType))}" mimeType="audio/mp4"${audioFormat.audioSampleRate?.let { " audioSamplingRate=\"$it\"" } ?: ""}>
-          <BaseURL>${xmlEscape("/api/videos/$videoId/media?url=${encodeXmlUrl(audioFormat.url)}")}</BaseURL>
+          <BaseURL>${xmlEscape("/api/videos/$videoId/adaptive/${audioFormat.itag}")}</BaseURL>
           <SegmentBase indexRange="${audioFormat.indexRange!!.start}-${audioFormat.indexRange!!.end}">
             <Initialization range="${audioFormat.initRange!!.start}-${audioFormat.initRange!!.end}"/>
           </SegmentBase>

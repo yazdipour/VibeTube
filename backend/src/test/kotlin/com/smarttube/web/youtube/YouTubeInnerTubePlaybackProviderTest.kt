@@ -25,6 +25,28 @@ class YouTubeInnerTubePlaybackProviderTest {
     }
 
     @Test
+    fun `parse hls formats prefers original audio group and avc variants`() {
+        val formats = parseHlsFormats(
+            manifestUrl = "https://example.com/master.m3u8",
+            manifestText = """
+                #EXTM3U
+                #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="dub",LANGUAGE="en-US",NAME="English - dubbed-auto"
+                #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="orig",LANGUAGE="de-DE",NAME="Deutsch - original"
+                #EXT-X-STREAM-INF:BANDWIDTH=5000000,CODECS="vp09.00.40.08,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="orig"
+                vp9-1080.m3u8
+                #EXT-X-STREAM-INF:BANDWIDTH=4500000,CODECS="avc1.640028,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="orig"
+                avc-1080.m3u8
+                #EXT-X-STREAM-INF:BANDWIDTH=4700000,CODECS="avc1.640028,mp4a.40.2",RESOLUTION=1920x1080,AUDIO="dub"
+                dubbed-avc-1080.m3u8
+            """.trimIndent(),
+        )
+
+        assertThat(formats).hasSize(1)
+        assertThat(formats.first().qualityLabel).isEqualTo("1080p")
+        assertThat(formats.first().url).isEqualTo("https://example.com/avc-1080.m3u8")
+    }
+
+    @Test
     fun `extract player metadata resolves player url and signature timestamp`() {
         val metadata = extractPlayerMetadata(
             """

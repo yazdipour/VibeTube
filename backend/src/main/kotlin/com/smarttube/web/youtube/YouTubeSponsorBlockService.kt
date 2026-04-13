@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.HttpClientErrorException
 
 @Service
 class YouTubeSponsorBlockService(
@@ -16,30 +17,23 @@ class YouTubeSponsorBlockService(
     
     fun getSkipSegments(videoId: String): List<SkipSegment> {
         return try {
-            logger.info("Fetching sponsor segments for video: $videoId")
             val url = "$apiBaseUrl/api/skipSegments?videoID=$videoId"
-            logger.info("Requesting: $url")
-            
             val response = restClient.get()
                 .uri(url)
                 .retrieve()
                 .body(Array<SponsorSegmentResponse>::class.java) ?: emptyArray()
-            
-            logger.info("Received ${response.size} sponsor segments from API")
-            
-            val segments = response.map { segment ->
-                logger.debug("Processing segment: ${segment.segment[0]}-${segment.segment[1]} (${segment.category})")
+
+            response.map { segment ->
                 SkipSegment(
                     startTime = segment.segment[0],
                     endTime = segment.segment[1],
                     category = mapCategory(segment.category),
                 )
             }
-            
-            logger.info("Returning ${segments.size} processed segments")
-            segments
+        } catch (_: HttpClientErrorException.NotFound) {
+            emptyList()
         } catch (e: Exception) {
-            logger.error("Error fetching sponsor segments for $videoId: ${e.message}", e)
+            logger.warn("SponsorBlock lookup failed for {}: {}", videoId, e.message)
             emptyList()
         }
     }

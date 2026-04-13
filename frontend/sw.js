@@ -1,8 +1,10 @@
-const CACHE_NAME = "vibetube-shell-v1";
+const CACHE_NAME = "vibetube-shell-v3";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/app.js",
+  "/hls.min.js",
+  "/dash.all.min.js",
   "/styles.css",
   "/manifest.webmanifest",
   "/icons/icon.svg",
@@ -25,6 +27,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -38,18 +46,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(request).then((cached) => cached || Response.error())),
   );
 });

@@ -17,9 +17,16 @@ class YouTubeVideoService(
         innerTubePlaybackProvider.getAvailableFormats(videoId)
             ?: throw noPlayableStream("Format extraction failed")
 
-    fun getDashManifest(videoId: String): String =
-        innerTubePlaybackProvider.getDashManifest(videoId)
+    fun getDashManifest(videoId: String, videoItag: Int? = null): String =
+        innerTubePlaybackProvider.getDashManifest(videoId, videoItag)
             ?: throw noPlayableStream("DASH manifest extraction failed")
+
+    fun getAdaptiveStreamUrl(videoId: String, itag: Int): String =
+        innerTubePlaybackProvider.getAdaptiveStreamUrl(videoId, itag)
+            ?: throw noPlayableStream("Adaptive stream extraction failed")
+
+    fun getAdaptiveStreamUrls(videoId: String, itag: Int): List<String> =
+        innerTubePlaybackProvider.getAdaptiveStreamUrls(videoId, itag)
 
     fun getSubtitleContent(captionUrl: String): String =
         innerTubePlaybackProvider.getSubtitleContent(captionUrl)

@@ -5,7 +5,11 @@ interface YouTubePlaybackProvider {
 
     fun getAvailableFormats(videoId: String): VideoFormatsInfo?
 
-    fun getDashManifest(videoId: String): String?
+    fun getDashManifest(videoId: String, videoItag: Int? = null): String?
+
+    fun getAdaptiveStreamUrl(videoId: String, itag: Int): String?
+
+    fun getAdaptiveStreamUrls(videoId: String, itag: Int): List<String>
 
     fun getSubtitleContent(captionUrl: String): String
 }

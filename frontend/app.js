@@ -82,7 +82,25 @@ async function registerServiceWorker() {
   }
 
   try {
-    await navigator.serviceWorker.register("./sw.js");
+    const registration = await navigator.serviceWorker.register("./sw.js");
+    await registration.update();
+
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+
+    registration.addEventListener("updatefound", () => {
+      const installingWorker = registration.installing;
+      if (!installingWorker) {
+        return;
+      }
+
+      installingWorker.addEventListener("statechange", () => {
+        if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
+          installingWorker.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    });
   } catch (error) {
     console.debug("Service worker registration failed", error);
   }
@@ -1189,6 +1207,9 @@ function attachVideoSource(streamUrl, subtitles = [], selectedFormat = "bestvide
   if (streamUrl.includes(".m3u8")) {
     if (window.Hls?.isSupported()) {
       hls = new window.Hls();
+      const preferredHeight = selectedFormat === "bestvideo+bestaudio/best"
+        ? null
+        : Number.parseInt(String(selectedFormat).match(/(\d{3,4})/)?.[1] || "", 10) || null;
       hls.on(window.Hls.Events.ERROR, (_event, data) => {
         logPlaybackError("HLS.js error", {
           streamUrl,
@@ -1202,7 +1223,20 @@ function attachVideoSource(streamUrl, subtitles = [], selectedFormat = "bestvide
       hls.attachMedia(videoPlayer);
       attachSubtitleTracks(subtitles);
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        selectPreferredHlsAudioTrack(hls);
+        if (preferredHeight) {
+          const levels = Array.isArray(hls.levels) ? hls.levels : [];
+          const matchIndex = levels.findIndex((level) => Number(level?.height) === preferredHeight);
+          if (matchIndex >= 0) {
+            hls.currentLevel = matchIndex;
+            hls.nextLevel = matchIndex;
+            hls.loadLevel = matchIndex;
+          }
+        }
         videoPlayer.play().catch(() => {});
+      });
+      hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, () => {
+        selectPreferredHlsAudioTrack(hls);
       });
       return;
     }
@@ -1245,6 +1279,24 @@ function stopPlayback() {
     dashPlayer = null;
   }
   currentSegments = [];
+}
+
+function selectPreferredHlsAudioTrack(hlsInstance) {
+  const tracks = Array.isArray(hlsInstance?.audioTracks) ? hlsInstance.audioTracks : [];
+  if (!tracks.length) {
+    return;
+  }
+
+  const originalIndex = tracks.findIndex((track) => /original/i.test(track?.name || ""));
+  if (originalIndex >= 0) {
+    hlsInstance.audioTrack = originalIndex;
+    return;
+  }
+
+  const nonDubbedIndex = tracks.findIndex((track) => !/dubbed/i.test(track?.name || ""));
+  if (nonDubbedIndex >= 0) {
+    hlsInstance.audioTrack = nonDubbedIndex;
+  }
 }
 
 function persistCurrentVideoProgress() {
@@ -1368,7 +1420,8 @@ async function renderWatchPage(videoId, formatOverride) {
       throw new Error(videoData?.error || "No stream URL available");
     }
 
-    attachVideoSource(videoData.dashManifestUrl || videoData.hlsManifestUrl || videoData.streamUrl, videoData.subtitles, resolvedFormat);
+    const playbackSource = videoData.streamUrl || videoData.hlsManifestUrl || videoData.dashManifestUrl;
+    attachVideoSource(playbackSource, videoData.subtitles, resolvedFormat);
     videoPlayer.removeEventListener("timeupdate", handleTimeUpdate);
     videoPlayer.addEventListener("timeupdate", handleTimeUpdate);
 

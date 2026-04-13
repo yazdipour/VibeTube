@@ -42,6 +42,26 @@ class YouTubeVideoServiceTest {
     }
 
     @Test
+    fun `get adaptive stream uses innertube provider`() {
+        val provider = FakePlaybackProvider(adaptiveUrl = "https://example.com/adaptive.mp4")
+
+        val service = YouTubeVideoService(provider)
+
+        assertThat(service.getAdaptiveStreamUrl("abc123", 137))
+            .isEqualTo("https://example.com/adaptive.mp4")
+    }
+
+    @Test
+    fun `get adaptive stream urls uses innertube provider`() {
+        val provider = FakePlaybackProvider(adaptiveUrls = listOf("https://example.com/a.mp4", "https://example.com/b.mp4"))
+
+        val service = YouTubeVideoService(provider)
+
+        assertThat(service.getAdaptiveStreamUrls("abc123", 137))
+            .containsExactly("https://example.com/a.mp4", "https://example.com/b.mp4")
+    }
+
+    @Test
     fun `get video stream preserves provider failure`() {
         val provider = FakePlaybackProvider(
             streamError = ResponseStatusException(HttpStatus.BAD_GATEWAY, "innertube failed"),
@@ -87,6 +107,8 @@ class YouTubeVideoServiceTest {
     private class FakePlaybackProvider(
         private val stream: VideoStreamInfo? = null,
         private val formats: VideoFormatsInfo? = null,
+        private val adaptiveUrl: String? = null,
+        private val adaptiveUrls: List<String> = adaptiveUrl?.let(::listOf) ?: emptyList(),
         private val subtitle: String = "",
         private val streamError: RuntimeException? = null,
         private val formatsError: RuntimeException? = null,
@@ -102,7 +124,11 @@ class YouTubeVideoServiceTest {
             return formats
         }
 
-        override fun getDashManifest(videoId: String): String? = null
+        override fun getDashManifest(videoId: String, videoItag: Int?): String? = null
+
+        override fun getAdaptiveStreamUrl(videoId: String, itag: Int): String? = adaptiveUrl
+
+        override fun getAdaptiveStreamUrls(videoId: String, itag: Int): List<String> = adaptiveUrls
 
         override fun getSubtitleContent(captionUrl: String): String {
             subtitleError?.let { throw it }
